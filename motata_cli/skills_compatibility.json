@@ -1,0 +1,29 @@
+{
+  "default_skills_source": "https://skill.motata.one",
+  "releases": [
+    {
+      "cli_version": "0.1.8",
+      "bundle_id": "motata-skills-2026-05-15",
+      "skills_source": "https://skill.motata.one",
+      "required_skills": [
+        "motata-starter",
+        "motata-report",
+        "motata-ad-ops",
+        "motata-token",
+        "motata-vertical-analyst"
+      ]
+    },
+    {
+      "cli_version": "0.1.8",
+      "bundle_id": "motata-skills-2026-05-15",
+      "skills_source": "https://motata-skills.pages.dev",
+      "required_skills": [
+        "motata-starter",
+        "motata-report",
+        "motata-ad-ops",
+        "motata-token",
+        "motata-vertical-analyst"
+      ]
+    }
+  ]
+}

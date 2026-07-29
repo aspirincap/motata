@@ -1,0 +1,24 @@
+[project]
+name = "motata-cli"
+version = "0.1.8"
+description = "Motata CLI for Meta ad delivery, discovery, validation, migration, and TikTok operations."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "beautifulsoup4>=4.12.0",
+  "requests>=2.31.0",
+  "six>=1.16.0",
+]
+
+[project.scripts]
+motata = "motata_cli.__main__:main"
+motata-handoff = "motata_cli.handoff:main"
+motata-token = "motata_cli.auth_center.fetch_token:main"
+motata-auth-center-token = "motata_cli.auth_center.fetch_token:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["motata_cli*"]

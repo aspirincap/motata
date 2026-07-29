@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+build/
+dist/
+motata_cli.egg-info/
+.venv*/
+.vendor/
+RECENT_REFACTOR_HANDOFF.md
+META_QUERY_RESULTS.md
+TIKTOK_QUERY_RESULTS.md
+TIKTOK_COMMANDS_AUDIT.md
+motata-token/
+motata-token.zip

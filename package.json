@@ -1,0 +1,38 @@
+{
+  "name": "motata",
+  "version": "0.1.8",
+  "description": "Motata CLI for Meta and TikTok ads operations, distributed via npm with an embedded Python runtime bootstrap.",
+  "bin": {
+    "motata": "bin/motata.js",
+    "motata-token": "bin/motata-token.js",
+    "motata-auth-center-token": "bin/motata-auth-center-token.js",
+    "motata-handoff": "bin/motata-handoff.js"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "scripts/npm-postinstall.js",
+    "motata_cli",
+    "!motata_cli/**/__pycache__",
+    "!motata_cli/**/*.pyc",
+    "!motata_cli/**/*.pyo",
+    "pyproject.toml",
+    "setup.cfg",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/npm-postinstall.js"
+  },
+  "keywords": [
+    "meta",
+    "tiktok",
+    "ads",
+    "cli",
+    "python"
+  ],
+  "license": "UNLICENSED",
+  "preferGlobal": true,
+  "engines": {
+    "node": ">=18"
+  }
+}
