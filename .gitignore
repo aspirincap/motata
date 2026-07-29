@@ -10,7 +10,9 @@ token.txt
 
 .agents/
 .claude/
+.trae/
 .venv*/
+.vendor/
 .wrangler/
 node_modules/
 __pycache__/
@@ -21,6 +23,7 @@ build/
 buildcheck/
 dist/
 *.tgz
+*.tar.gz
 *.whl
 *.zip
 
@@ -29,6 +32,10 @@ meta_ad_previews/
 motata-ad-ops/
 motata-starter/
 motata-token/
+skills/
+
+scripts/*
+!scripts/npm-postinstall.js
 
 /*.md
 !/README.md
