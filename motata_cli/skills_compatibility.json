@@ -2,7 +2,7 @@
   "default_skills_source": "https://skill.motata.one",
   "releases": [
     {
-      "cli_version": "0.1.8",
+      "cli_version": "0.1.9",
       "bundle_id": "motata-skills-2026-05-15",
       "skills_source": "https://skill.motata.one",
       "required_skills": [
@@ -14,7 +14,7 @@
       ]
     },
     {
-      "cli_version": "0.1.8",
+      "cli_version": "0.1.9",
       "bundle_id": "motata-skills-2026-05-15",
       "skills_source": "https://motata-skills.pages.dev",
       "required_skills": [

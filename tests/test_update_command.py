@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from motata_cli import __version__
 from motata_cli.__main__ import build_parser
 from motata_cli import update as update_module
 
@@ -115,23 +116,23 @@ class UpdateCommandTests(unittest.TestCase):
 
     def test_compatibility_release_for_current_version(self) -> None:
         release = update_module.compatibility_release_for(
-            "0.1.6",
+            __version__,
             skills_source=DEFAULT_SOURCE,
         )
 
         self.assertIsNotNone(release)
-        self.assertEqual(release["bundle_id"], "motata-skills-2026-05-13")
+        self.assertEqual(release["bundle_id"], "motata-skills-2026-05-15")
         self.assertIn("motata-report", release["required_skills"])
 
     def test_compatibility_release_supports_legacy_alias(self) -> None:
         release = update_module.compatibility_release_for(
-            "0.1.6",
+            __version__,
             skills_source=LEGACY_SOURCE,
             prefer_remote=False,
         )
 
         self.assertIsNotNone(release)
-        self.assertEqual(release["bundle_id"], "motata-skills-2026-05-13")
+        self.assertEqual(release["bundle_id"], "motata-skills-2026-05-15")
 
     def test_compatibility_manifest_url_uses_well_known_endpoint(self) -> None:
         url = update_module.compatibility_manifest_url(DEFAULT_SOURCE)
@@ -169,7 +170,7 @@ class UpdateCommandTests(unittest.TestCase):
         update_module.fetch_remote_compatibility_manifest = lambda source: {
             "releases": [
                 {
-                    "cli_version": "0.1.6",
+                    "cli_version": __version__,
                     "bundle_id": "remote-legacy-only",
                     "skills_source": LEGACY_SOURCE,
                     "required_skills": ["motata-starter"],
@@ -178,14 +179,14 @@ class UpdateCommandTests(unittest.TestCase):
         }
         try:
             release = update_module.compatibility_release_for(
-                "0.1.6",
+                __version__,
                 skills_source=DEFAULT_SOURCE,
             )
         finally:
             update_module.fetch_remote_compatibility_manifest = original_fetch
 
         self.assertIsNotNone(release)
-        self.assertEqual(release["bundle_id"], "motata-skills-2026-05-13")
+        self.assertEqual(release["bundle_id"], "motata-skills-2026-05-15")
 
     def test_fetch_remote_manifest_sends_user_agent(self) -> None:
         class FakeResponse:
@@ -217,7 +218,7 @@ class UpdateCommandTests(unittest.TestCase):
             update_module.request.urlopen = original_urlopen
 
         self.assertIsNotNone(payload)
-        self.assertEqual(captured["user_agent"], "motata-cli/0.1.6")
+        self.assertEqual(captured["user_agent"], f"motata-cli/{__version__}")
         self.assertEqual(captured["accept"], "application/json")
 
     def test_build_skills_drift_notice_when_stamp_missing(self) -> None:

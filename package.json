@@ -1,6 +1,6 @@
 {
   "name": "motata",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Motata CLI for Meta and TikTok ads operations, distributed via npm with an embedded Python runtime bootstrap.",
   "bin": {
     "motata": "bin/motata.js",

@@ -119,7 +119,13 @@ class ReportMetaRunTests(unittest.TestCase):
         self.assertEqual(standard_no_preview_payload["options"]["preview_fetch_limit"], 0)
 
     def test_activity_daily_breakdown_uses_meta_time_increment(self) -> None:
-        runner = MetaReportRunner(self._args(dry_run=False))
+        args = self._args(dry_run=False)
+        args.period = "custom"
+        args.since = "2026-05-07"
+        args.until = "2026-05-13"
+        args.previous_since = "2026-04-30"
+        args.previous_until = "2026-05-06"
+        runner = MetaReportRunner(args)
         activities = {
             "rows": [
                 {
@@ -132,8 +138,16 @@ class ReportMetaRunTests(unittest.TestCase):
         }
         calls: list[dict] = []
 
-        def fake_daily(meta, object_id, window, *, limit, async_report):
-            calls.append({"object_id": object_id, "window": window, "limit": limit, "async_report": async_report})
+        def fake_daily(meta, object_id, window, *, limit, async_report, metric_fields):
+            calls.append(
+                {
+                    "object_id": object_id,
+                    "window": window,
+                    "limit": limit,
+                    "async_report": async_report,
+                    "metric_fields": metric_fields,
+                }
+            )
             return [{"date_start": "2026-05-10", "spend": "100"}]
 
         with patch("motata_cli.report.meta._pull_object_daily_insights", side_effect=fake_daily):
@@ -159,8 +173,16 @@ class ReportMetaRunTests(unittest.TestCase):
         }
         calls: list[dict] = []
 
-        def fake_daily(meta, object_id, window, *, limit, async_report):
-            calls.append({"object_id": object_id, "window": window, "limit": limit, "async_report": async_report})
+        def fake_daily(meta, object_id, window, *, limit, async_report, metric_fields):
+            calls.append(
+                {
+                    "object_id": object_id,
+                    "window": window,
+                    "limit": limit,
+                    "async_report": async_report,
+                    "metric_fields": metric_fields,
+                }
+            )
             return [{"date_start": "2026-05-12", "spend": "120"}]
 
         with patch("motata_cli.report.meta._pull_object_daily_insights", side_effect=fake_daily):
