@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from motata_cli import __version__
@@ -14,6 +15,37 @@ LEGACY_SOURCE = "https://motata-skills.pages.dev"
 
 
 class UpdateCommandTests(unittest.TestCase):
+    def setUp(self) -> None:
+        env = patch.dict("os.environ", {}, clear=True)
+        env.start()
+        self.addCleanup(env.stop)
+        network = patch("urllib.request.urlopen", side_effect=AssertionError("network forbidden in unit tests"))
+        network.start()
+        self.addCleanup(network.stop)
+        # Block alternative network paths and subprocesses (npm/npx/pip) too.
+        for target in ("socket.socket.connect", "socket.socket.connect_ex", "subprocess.run"):
+            guard = patch(target, side_effect=AssertionError("external I/O forbidden in update unit tests"))
+            guard.start()
+            self.addCleanup(guard.stop)
+
+    def test_npm_launcher_detected_from_installed_site_packages(self) -> None:
+        with patch.dict("os.environ", {"MOTATA_INSTALL_METHOD": "npm"}):
+            self.assertEqual(update_module.detect_install_method(root=Path("/tmp/site-packages")), "npm")
+
+    def test_unknown_channel_does_not_override_detection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.dict("os.environ", {"MOTATA_INSTALL_METHOD": "unknown"}):
+                self.assertEqual(update_module.detect_install_method(root=Path(tmp)), "pip")
+
+    def test_runtime_python_symlink_keeps_channel(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "package.json").write_text("{}")
+            python_path = root / ".runtime/venv/bin/python"
+            python_path.parent.mkdir(parents=True)
+            python_path.symlink_to(__import__("sys").executable)
+            self.assertEqual(update_module.detect_install_method(root=root, python_executable=str(python_path)), "npm")
+
     def test_update_command_is_exposed(self) -> None:
         parser = build_parser()
 
@@ -118,6 +150,7 @@ class UpdateCommandTests(unittest.TestCase):
         release = update_module.compatibility_release_for(
             __version__,
             skills_source=DEFAULT_SOURCE,
+            prefer_remote=False,
         )
 
         self.assertIsNotNone(release)
@@ -196,7 +229,8 @@ class UpdateCommandTests(unittest.TestCase):
             def __exit__(self, exc_type, exc, tb):
                 return False
 
-            def read(self) -> bytes:
+            def read(self, limit: int) -> bytes:
+                captured["read_limit"] = limit
                 return (
                     b'{"releases":[{"cli_version":"0.1.6","skills_source":"https://skill.motata.one"}]}'
                 )
@@ -220,6 +254,7 @@ class UpdateCommandTests(unittest.TestCase):
         self.assertIsNotNone(payload)
         self.assertEqual(captured["user_agent"], f"motata-cli/{__version__}")
         self.assertEqual(captured["accept"], "application/json")
+        self.assertEqual(captured["read_limit"], 2_000_001)
 
     def test_build_skills_drift_notice_when_stamp_missing(self) -> None:
         notice = update_module.build_skills_drift_notice(

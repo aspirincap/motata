@@ -90,7 +90,7 @@ The init flow is the recommended onboarding entry because it confirms execution 
 5. allow multi-select account picking for Meta and TikTok
 6. fetch user-type classification and show a "getting recommended metrics" step
 7. let the user keep or override recommended metrics
-8. finish with a suggested next step instead of forcing only daily reporting
+8. save a suggested daily-report command as a starting point; choose the actual next workflow by scenario
 
 ### Interaction model
 
@@ -268,13 +268,13 @@ Entry points:
 - `motata product scrape`
 - `motata product intake`
 
-Outputs:
+CLI outputs:
 
-- campaign brief
-- value propositions
-- audience hypotheses
-- budget split
-- testing matrix
+- extracted product/page facts
+- value-proposition candidates
+- objective and asset-requirement hints
+
+A budget split, audience hypothesis and testing matrix are separate planning work performed by the agent with user-confirmed goals; the intake command does not generate or validate a complete launch plan.
 
 ### 4) Page or SKU diagnosis
 
@@ -295,11 +295,7 @@ Entry points:
 - `motata report meta run --period daily`
 - `motata report tiktok run --period daily`
 
-Outputs:
-
-- anomaly list
-- key change explanations
-- same-day actions
+CLI outputs source JSON and a completeness manifest. Anomaly explanations and proposed actions are a separate diagnosis step; do not automate budget changes from degraded or truncated data.
 
 ### 6) Weekly review
 
@@ -310,13 +306,15 @@ Entry points:
 - `motata report meta run --period weekly`
 - `motata report tiktok run --period weekly`
 
-Outputs:
+The `report ... run` commands collect source JSON and a manifest, including current/previous windows and completeness. HTML rendering and recommendation writing are separate steps.
 
-- HTML report
-- KPI summary
-- period-over-period changes
-- issue list
-- next-step recommendations
+For GMV Max runs, an installed renderer is available:
+
+```bash
+motata report render-gmv-max --run-dir /path/to/run --out /path/to/report.html
+```
+
+Rendering is offline by default (existing remote image URLs may still load in a browser). Use `--cache-images` only to explicitly allow image downloads. Other report types use the Motata report skill; a manifest alone is not a finished HTML artifact.
 
 ### 7) Creative fatigue detection
 
@@ -369,8 +367,28 @@ Outputs:
 
 - migration plan
 - precheck results
-- resumable execution log
-- failed asset list
+- versioned checkpoint and source-to-target ledger
+- confirmed IDs, uncertain writes and plan-only cleanup inventory
+
+Use the same `--job-id` with `resume`. Confirmed operations are skipped; uncertain writes stop in `needs_review` and require manual reconciliation. Names are never trusted as idempotency keys. Legacy jobs without a ledger cannot safely resume. Migration creates PAUSED objects and does not run hidden create/delete probes or automatic cleanup.
+
+## Safety, Compatibility and Development
+
+- Exit codes: `0` success, `1` failed/needs review, `2` argument error, `3` partial/degraded. Report manifests remain available after partial failure.
+- `PAUSED` / `DISABLE` still creates real remote objects. Meta live validation requires `--allow-live-probe`; cleanup is best effort. TikTok copy/bootstrap now defaults all created levels to `DISABLE`.
+- Pagination limits are explicit. Monetary aggregation and rankings remain within a currency; unknown currencies remain account-isolated. No automatic FX conversion is performed.
+- npm runtime checks Python >=3.11, repairs incomplete installs, serializes initialization, and preserves the caller's working directory.
+- Published skills have a single source: `registry/skills/`. Root copies, `skills/` symlinks and local agent installations are not release sources.
+- This working tree contains unreleased hardening changes; no package or registry is published by the test/build commands below.
+
+```bash
+python3 scripts/run_offline_tests.py
+node --test tests/runtime.test.js tests/runtime-lock.test.js
+python3 scripts/check_release.py --pack-only
+python3 scripts/build_skill_registry.py
+```
+
+See [execution contracts](docs/execution-contracts.md), [architecture](docs/architecture.md), [release engineering](docs/release-engineering.md), and [validation results](docs/hardening-validation.md).
 
 ## Quick Start Examples
 
@@ -406,6 +424,7 @@ motata meta validate ad-link \
   --access-token "$META_ACCESS_TOKEN" \
   --adset-id <ADSET_ID> \
   --creative-id <CREATIVE_ID> \
+  --allow-live-probe \
   --cleanup
 ```
 

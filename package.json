@@ -21,7 +21,9 @@
     "README.md"
   ],
   "scripts": {
-    "postinstall": "node scripts/npm-postinstall.js"
+    "postinstall": "node scripts/npm-postinstall.js",
+    "test:runtime": "node --test tests/runtime.test.js tests/runtime-lock.test.js",
+    "check:release": "python3 scripts/check_release.py"
   },
   "keywords": [
     "meta",

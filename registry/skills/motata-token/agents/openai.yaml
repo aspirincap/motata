@@ -1,0 +1,4 @@
+interface:
+  display_name: "Motata Token"
+  short_description: "Fetch Auth Center tokens and inventories"
+  default_prompt: "Use Motata Token to list ad accounts, fetch access tokens, pull the full inventory of attached tokens when no account id is known, or troubleshoot Auth Center OpenAPI auth. If the user is still onboarding token source, account scope, or baseline metrics, start with motata init first."

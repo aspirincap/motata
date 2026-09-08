@@ -3,7 +3,9 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from motata_cli.meta.commands import CliError, print_output, validate_non_empty, write_json_file
+from motata_cli.common.errors import CliError
+from motata_cli.meta.output import print_output
+from motata_cli.common.utils import validate_non_empty, write_json_file
 
 from .intake import build_product_intake
 from .scraper import scrape_product

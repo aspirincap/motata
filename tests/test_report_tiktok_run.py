@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 import unittest
 from datetime import date
-from unittest.mock import patch
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import Mock, patch
 
+from motata_cli.common.output import completeness
 from motata_cli.report.meta import resolve_period
 from motata_cli.report.tiktok import TikTokReportRunner, _metric_sets, tiktok_depth_plan
 
@@ -31,6 +35,62 @@ class ReportTikTokRunTests(unittest.TestCase):
             include_previews=None,
             include_product=False,
         )
+
+    def test_gmv_max_page_caps_preserve_incomplete_source_state(self) -> None:
+        for page_info in ({}, {"total_page": 2}, {"total_page": 1}):
+            with self.subTest(page_info=page_info):
+                args = self._args(depth="fast")
+                args.page_size = 1
+                runner = TikTokReportRunner(args)
+                client = Mock()
+                client.list_gmv_max_campaigns.return_value = {
+                    "data": {"list": [{"campaign_id": "campaign-1"}], "page_info": page_info}
+                }
+                client.gmv_max_report.return_value = {
+                    "data": {"list": [{"metrics": {"cost": "10"}}], "page_info": page_info}
+                }
+                payloads = [
+                    runner._pull_gmv_max_campaigns(client, "123", "PRODUCT_GMV_MAX", stores_payload={}),
+                    runner._pull_gmv_max_report_level(client, "123", "account", ("2026-01-01", "2026-01-02"), store_ids=["store-1"]),
+                ]
+                truncated = page_info.get("total_page") != 1
+                for payload in payloads:
+                    self.assertEqual(payload["truncated"], truncated)
+                    self.assertEqual(payload["pages_fetched"], 1)
+                    self.assertEqual(payload["stop_reason"], "max_pages" if truncated else "exhausted")
+                    self.assertEqual(completeness(payload)["exit_code"], 3 if truncated else 0)
+
+    def test_gmv_max_authoritative_last_page_avoids_extra_request(self) -> None:
+        args = self._args(depth="standard")
+        args.page_size = 1
+        runner = TikTokReportRunner(args)
+        client = Mock()
+        response = {"data": {"list": [{"campaign_id": "campaign-1"}], "page_info": {"total_page": 1}}}
+        client.list_gmv_max_campaigns.return_value = response
+        client.gmv_max_report.return_value = response
+        runner._pull_gmv_max_campaigns(client, "123", "PRODUCT_GMV_MAX", stores_payload={})
+        runner._pull_gmv_max_report_level(client, "123", "account", ("2026-01-01", "2026-01-02"), store_ids=["store-1"])
+        self.assertEqual(client.list_gmv_max_campaigns.call_count, 1)
+        self.assertEqual(client.gmv_max_report.call_count, 1)
+
+    def test_gmv_max_truncation_reaches_saved_manifest_and_coverage(self) -> None:
+        with TemporaryDirectory() as directory:
+            args = self._args(depth="fast", dry_run=False)
+            args.run_dir = directory
+            args.page_size = 1
+            args.compare = False
+            args.tiktok_report_mode = "gmv_max"
+            client = Mock()
+            client.list_stores.return_value = {"data": {"store_list": [{"store_id": "store-1", "is_gmv_max_available": True}]}}
+            client.list_gmv_max_campaigns.return_value = {"data": {"list": [{"campaign_id": "campaign-1"}], "page_info": {"total_page": 2}}}
+            client.gmv_max_report.return_value = {"data": {"list": [{"metrics": {"cost": "10"}}], "page_info": {"total_page": 2}}}
+            with patch("motata_cli.tiktok.commands.resolve_tiktok_client", return_value=(args.advertiser_id, client)):
+                result = TikTokReportRunner(args).run()
+            saved = json.loads((Path(directory) / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(saved, result)
+            self.assertEqual(saved["completeness"]["exit_code"], 3)
+            self.assertEqual(saved["gmv_max"]["coverage"], "partial")
+            self.assertEqual(saved["gmv_max"]["completeness"]["status"], "partial_success")
 
     def test_weekly_period_matches_meta_contract(self) -> None:
         args = argparse.Namespace(

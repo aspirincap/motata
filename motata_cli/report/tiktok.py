@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from motata_cli.common.output import error_kind, pagination, request_with_retry
+from motata_cli.common.output import completeness, finalize, unsupported_metrics
+from motata_cli.common.security import redact
+
 import argparse
 import json
 import time
@@ -14,8 +18,8 @@ from motata_cli.init_profile import (
     resolve_default_accounts,
     resolve_init_metrics,
 )
-from motata_cli.meta.commands import CliError
-from motata_cli.meta.output import print_output
+from motata_cli.common.errors import CliError
+from motata_cli.common.display import print_output
 from motata_cli.report.meta import PeriodWindow, resolve_period
 from motata_cli.report.activity_factors import build_activity_factor_report, rank_activity_targets
 from motata_cli.tiktok.app_discovery import APP_ADGROUP_FIELDS, APP_CAMPAIGN_FIELDS, build_tiktok_app_report
@@ -369,6 +373,8 @@ def default_run_dir(advertiser_id: str, period: str, depth: str, window: PeriodW
 
 
 def _write_json(path: Path, payload: Any) -> None:
+    if isinstance(payload, dict):
+        finalize(payload)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -446,7 +452,7 @@ def _pull_basic_report(
         rows: list[dict[str, Any]] = []
         try:
             for page in range(1, (max_pages or 1) + 1):
-                response = client.integrated_report(
+                response = request_with_retry(client.integrated_report,
                     "BASIC",
                     advertiser_id=advertiser_id,
                     data_level=str(spec["data_level"]),
@@ -462,9 +468,11 @@ def _pull_basic_report(
                 )
                 page_rows = _extract_collection(response, "list")
                 rows.extend(page_rows)
-                if len(page_rows) < page_size:
+                page_status = pagination(page, page_size, len(page_rows), _total_pages(response))
+                if not page_status['truncated']:
                     break
             return {
+                **page_status,
                 "platform": "tiktok",
                 "report_type": "BASIC",
                 "data_level": spec["data_level"],
@@ -477,6 +485,8 @@ def _pull_basic_report(
                 "warnings": warnings,
             }
         except Exception as exc:
+            if not unsupported_metrics(exc):
+                raise
             last_error = str(exc)
             warnings.append({"fallback": "retrying with a narrower TikTok metric set", "error": last_error, "metrics": metrics})
     raise RuntimeError(last_error or f"TikTok {level} report failed")
@@ -853,25 +863,28 @@ class TikTokReportRunner:
                 _write_json(path, payload)
                 self.record(
                     name,
-                    "ok",
+                    completeness(payload)["status"],
                     str(path),
+                    completeness=completeness(payload),
                     attempts=attempt,
                     rows=_row_count(payload),
                     duration_sec=round(time.monotonic() - source_started_at, 3),
                 )
                 return payload
             except Exception as exc:
-                last_error = str(exc)
+                last_error = redact(str(exc), (getattr(self.args, 'access_token', ''),))
+                if error_kind(exc) not in {"network", "rate_limit"}:
+                    break
                 if attempt < attempts:
                     time.sleep(max(0.0, float(self.args.retry_wait or 0.0)))
-        error_payload = {"error": last_error, "source": name, "status": "degraded"}
+        error_payload = {"error": last_error, "source": name, "status": "failed"}
         _write_json(path, error_payload)
         self.record(
             name,
-            "degraded",
+            "failed",
             str(path),
             error=last_error,
-            attempts=attempts,
+            attempts=attempt,
             duration_sec=round(time.monotonic() - source_started_at, 3),
         )
         return error_payload
@@ -993,6 +1006,7 @@ class TikTokReportRunner:
             )
 
         current_rows: dict[str, list[dict[str, Any]]] = {}
+        source_metadata: dict[str, Any] = {}
         previous_rows: dict[str, list[dict[str, Any]]] = {}
         for level in self.plan.insight_levels:
             payload = self.run_source(
@@ -1009,6 +1023,7 @@ class TikTokReportRunner:
             )
             if isinstance(payload, dict) and isinstance(payload.get("rows"), list):
                 current_rows[level] = payload["rows"]
+            source_metadata[level] = {key: value for key, value in payload.items() if key != 'rows'}
 
         if self.plan.include_landing:
             payload = self.run_source(
@@ -1025,6 +1040,7 @@ class TikTokReportRunner:
             )
             if isinstance(payload, dict) and isinstance(payload.get("rows"), list):
                 current_rows["ad_v2"] = payload["rows"]
+            source_metadata['ad_v2'] = {key: value for key, value in payload.items() if key != 'rows'}
 
         if self.window.has_previous:
             for level in self.plan.previous_levels:
@@ -1077,6 +1093,7 @@ class TikTokReportRunner:
                     smart_plus=bool(self.args.smart_plus),
                     ad_limit=self.plan.landing_ad_limit,
                     ad_detail_cache=self.ad_detail_cache,
+                    preloaded_report_metadata={key: value for key, value in source_metadata.items() if key in {'ad', 'ad_v2'}},
                     preloaded_report_rows=current_rows.get("ad") or [],
                     preloaded_asset_report_rows=current_rows.get("ad_v2") or [],
                 ),
@@ -1223,9 +1240,11 @@ class TikTokReportRunner:
             )
             page_rows = _campaign_rows(response)
             rows.extend(page_rows)
-            if len(page_rows) < page_size:
+            page_status = pagination(page, page_size, len(page_rows), _total_pages(response))
+            if not page_status["truncated"]:
                 break
         return {
+            **page_status,
             "platform": "tiktok",
             "source": "gmv_max_campaigns_live" if promotion_type == "LIVE_GMV_MAX" else "gmv_max_campaigns_product",
             "advertiser_id": str(advertiser_id),
@@ -1301,7 +1320,10 @@ class TikTokReportRunner:
                         campaign_ids=product_campaign_ids,
                     ),
                 )
-        self.manifest["gmv_max"]["coverage"] = "full"
+        gmv_sources = [source for source in self.manifest["sources"] if "gmv_max" in source["name"]]
+        gmv_completeness = completeness({"sources": gmv_sources})
+        self.manifest["gmv_max"]["coverage"] = "full" if gmv_completeness["complete"] else "partial"
+        self.manifest["gmv_max"]["completeness"] = gmv_completeness
         return {"store_ids": store_ids, "product_campaigns": product_campaigns, "live_campaigns": live_campaigns}
 
     def _record_skipped(self, name: str, reason: str) -> None:
@@ -1383,13 +1405,15 @@ class TikTokReportRunner:
                 )
                 page_rows = _extract_collection(response, "list")
                 rows.extend(row for row in page_rows if isinstance(row, dict))
-                if len(page_rows) < page_size:
+                page_status = pagination(page, page_size, len(page_rows), _total_pages(response))
+                if not page_status["truncated"]:
                     break
         except Exception as exc:
             warnings.append({"error": str(exc), "metrics": metrics})
             raise
         _annotate_gmv_max_rows(rows)
         return {
+            **page_status,
             "platform": "tiktok",
             "source": f"gmv_max_{level}",
             "advertiser_id": str(advertiser_id),
@@ -1898,7 +1922,9 @@ class TikTokReportRunner:
                             )
                         break
                     except Exception as exc:
-                        last_error = str(exc)
+                        if not unsupported_metrics(exc):
+                            raise
+                        last_error = redact(str(exc), (getattr(self.args, 'access_token', ''),))
                 else:
                     for object_id in batch:
                         errors.append({"level": level, "object_id": object_id, "error": last_error})
@@ -1966,13 +1992,14 @@ class TikTokReportRunner:
         )
 
 
-def command_tiktok_report_run(args: argparse.Namespace) -> None:
+def command_tiktok_report_run(args: argparse.Namespace) -> int:
     args = _prepare_tiktok_report_args(args)
     advertiser_ids = list(getattr(args, "advertiser_ids", [args.advertiser_id]))
     if len(advertiser_ids) == 1:
         runner = TikTokReportRunner(args)
-        print_output(runner.run(), as_json=True)
-        return
+        result = runner.run()
+        print_output(result, as_json=True)
+        return result.get("completeness", {}).get("exit_code", 0)
 
     runs: list[dict[str, Any]] = []
     for advertiser_id in advertiser_ids:
@@ -1992,4 +2019,5 @@ def command_tiktok_report_run(args: argparse.Namespace) -> None:
         "run_count": len(runs),
         "runs": runs,
     }
-    print_output(result, as_json=True)
+    print_output(finalize(result), as_json=True)
+    return result["completeness"]["exit_code"]

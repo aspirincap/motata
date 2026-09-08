@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from motata_cli.common.errors import CliError
+from motata_cli.common.utils import json_compact
+from motata_cli.meta.utils import parse_meta_error_payload
+from motata_cli.meta.services.resources import cleanup_object, create_ad, create_adset, create_campaign
 import argparse
 import copy
 import json
@@ -8,14 +12,6 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from motata_cli.meta.client import MetaClient
-
-
-def _commands_module() -> Any:
-    # Import lazily so this module can reuse the existing command helpers
-    # without introducing an import cycle during module initialization.
-    from motata_cli.meta import commands as meta_commands
-
-    return meta_commands
 
 
 def remap_promoted_object_for_target(
@@ -42,7 +38,7 @@ def remap_promoted_object_for_target(
 
 
 def describe_validation_error(exc: Exception) -> str:
-    payload = _commands_module().parse_meta_error_payload(exc)
+    payload = parse_meta_error_payload(exc)
     if payload:
         title = payload.get("title")
         message = payload.get("message")
@@ -74,7 +70,6 @@ def build_validation_adset_args(
     promoted_object: dict[str, Any],
     name: str,
 ) -> argparse.Namespace:
-    commands = _commands_module()
     bid_constraints = source_adset.get("bid_constraints")
     return argparse.Namespace(
         campaign_id=campaign_id,
@@ -82,13 +77,13 @@ def build_validation_adset_args(
         optimization_goal=source_adset.get("optimization_goal"),
         billing_event=source_adset.get("billing_event"),
         status="PAUSED",
-        targeting_json=commands.json_compact(source_adset.get("targeting") or {}),
-        promoted_object_json=commands.json_compact(promoted_object),
+        targeting_json=json_compact(source_adset.get("targeting") or {}),
+        promoted_object_json=json_compact(promoted_object),
         daily_budget=source_adset.get("daily_budget"),
         lifetime_budget=source_adset.get("lifetime_budget"),
         bid_amount=source_adset.get("bid_amount"),
         bid_strategy=source_adset.get("bid_strategy"),
-        bid_constraints_json=commands.json_compact(bid_constraints) if bid_constraints else None,
+        bid_constraints_json=json_compact(bid_constraints) if bid_constraints else None,
         start_time=source_adset.get("start_time"),
         end_time=source_adset.get("end_time"),
         destination_type=source_adset.get("destination_type"),
@@ -106,9 +101,8 @@ def validate_promoted_object_probe(
     promoted_object: dict[str, Any],
     cleanup: bool = True,
 ) -> dict[str, Any]:
-    commands = _commands_module()
     campaign_name = f"motata-validate-campaign-{uuid.uuid4().hex[:8]}"
-    campaign = commands.create_campaign(
+    campaign = create_campaign(
         meta,
         account_id,
         build_validation_campaign_args(source_campaign, name=campaign_name),
@@ -121,18 +115,18 @@ def validate_promoted_object_probe(
             promoted_object=promoted_object,
             name=f"motata-validate-adset-{uuid.uuid4().hex[:8]}",
         )
-        result["adset"] = commands.create_adset(meta, account_id, validate_args)
+        result["adset"] = create_adset(meta, account_id, validate_args)
         return result
     finally:
         adset = result.get("adset") or {}
         if cleanup and adset.get("id"):
             try:
-                result["adset_cleanup"] = commands.cleanup_object(meta, adset["id"])
+                result["adset_cleanup"] = cleanup_object(meta, adset["id"])
             except Exception as cleanup_exc:  # pragma: no cover - best effort cleanup
                 result["adset_cleanup_error"] = str(cleanup_exc)
         if cleanup and campaign.get("id"):
             try:
-                result["campaign_cleanup"] = commands.cleanup_object(meta, campaign["id"])
+                result["campaign_cleanup"] = cleanup_object(meta, campaign["id"])
             except Exception as cleanup_exc:  # pragma: no cover - best effort cleanup
                 result["campaign_cleanup_error"] = str(cleanup_exc)
 
@@ -215,7 +209,7 @@ def validate_target_promoted_objects(
                     "or override promoted_object fields with --promoted-object-overrides."
                 )
     if blockers:
-        raise _commands_module().CliError(
+        raise CliError(
             "Migration blocked by target promoted-object validation:\n- " + "\n- ".join(blockers)
         )
 
@@ -240,7 +234,6 @@ def validate_ad_link_probe(
     creative_id: str,
     cleanup: bool = True,
 ) -> dict[str, Any]:
-    commands = _commands_module()
     result = validate_promoted_object_probe(
         meta,
         account_id,
@@ -259,7 +252,7 @@ def validate_ad_link_probe(
             tracking_specs_json=None,
             conversion_domain=None,
         )
-        result["ad"] = commands.create_ad(meta, account_id, ad_args)
+        result["ad"] = create_ad(meta, account_id, ad_args)
         return result
     finally:
         ad = result.get("ad") or {}
@@ -267,17 +260,17 @@ def validate_ad_link_probe(
         campaign = result.get("campaign") or {}
         if cleanup and ad.get("id"):
             try:
-                result["ad_cleanup"] = commands.cleanup_object(meta, ad["id"])
+                result["ad_cleanup"] = cleanup_object(meta, ad["id"])
             except Exception as cleanup_exc:  # pragma: no cover - best effort cleanup
                 result["ad_cleanup_error"] = str(cleanup_exc)
         if cleanup and adset.get("id"):
             try:
-                result["adset_cleanup"] = commands.cleanup_object(meta, adset["id"])
+                result["adset_cleanup"] = cleanup_object(meta, adset["id"])
             except Exception as cleanup_exc:  # pragma: no cover - best effort cleanup
                 result["adset_cleanup_error"] = str(cleanup_exc)
         if cleanup and campaign.get("id"):
             try:
-                result["campaign_cleanup"] = commands.cleanup_object(meta, campaign["id"])
+                result["campaign_cleanup"] = cleanup_object(meta, campaign["id"])
             except Exception as cleanup_exc:  # pragma: no cover - best effort cleanup
                 result["campaign_cleanup_error"] = str(cleanup_exc)
 
@@ -334,7 +327,7 @@ def validate_target_app_ad_links(
                         "The recreated creative is not compatible with the target app/page/promoted-object combination."
                     )
     if blockers:
-        raise _commands_module().CliError(
+        raise CliError(
             "Migration blocked by target ad-link validation:\n- " + "\n- ".join(blockers)
         )
 
@@ -373,6 +366,6 @@ def validate_migration_preflight(
                         f"Campaign {campaign_label} / ad set {adset_label} is APP_INSTALLS but promoted_object is missing: {', '.join(missing_fields)}."
                     )
     if blockers:
-        raise _commands_module().CliError(
+        raise CliError(
             "Migration blocked by preflight validation:\n- " + "\n- ".join(blockers)
         )

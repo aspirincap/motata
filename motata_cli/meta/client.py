@@ -7,6 +7,10 @@ from typing import Any, Callable
 
 import requests
 
+from motata_cli.common.security import network_error, redact
+
+_REQUEST_TIMEOUT = (10, 120)
+
 ErrorFactory = Callable[[str], Exception]
 
 _DEBUG_ENABLED = False
@@ -24,7 +28,7 @@ def _debug_log(message: str) -> None:
 
 
 def _progress_log(message: str) -> None:
-    print(f"[motata meta] {message}", file=sys.stderr)
+    print(f"[motata meta] {redact(message)}", file=sys.stderr)
 
 
 class MetaClient:
@@ -38,7 +42,7 @@ class MetaClient:
     ):
         self.access_token = access_token
         self.base = base_url or f"https://graph.facebook.com/{version}"
-        self.error_factory = error_factory
+        self.error_factory = lambda message: error_factory(redact(message, (self.access_token,)))
 
     def _url(self, path: str) -> str:
         path = path.lstrip("/")
@@ -47,14 +51,25 @@ class MetaClient:
     def _sanitize_payload(self, payload: dict[str, Any] | None) -> dict[str, Any] | None:
         if payload is None:
             return None
-        sanitized = dict(payload)
-        sanitized.pop("access_token", None)
-        return sanitized
+        return redact(payload, (self.access_token,))
+
+    def _request(self, method: str, url: str, **kwargs) -> dict[str, Any]:
+        diagnostics = {key: value for key, value in kwargs.items() if key != "files"}
+        _debug_log(redact(f"{method.upper()} {url} {redact(diagnostics, (self.access_token,))}", (self.access_token,)))
+        try:
+            response = getattr(requests, method)(url, timeout=_REQUEST_TIMEOUT, **kwargs)
+            return self._handle(response)
+        except (requests.RequestException, ValueError) as exc:
+            raise self.error_factory(network_error("Meta", exc, write=method != "get")) from None
 
     def _handle(self, response: requests.Response) -> dict[str, Any]:
         payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("Expected a JSON object")
         if "error" in payload:
             error = payload["error"]
+            if not isinstance(error, dict):
+                raise ValueError("Expected a JSON error object")
             raise self.error_factory(
                 json.dumps(
                     {
@@ -73,9 +88,7 @@ class MetaClient:
 
     def get(self, path: str, *, params: dict[str, Any] | None = None) -> dict[str, Any]:
         final_params = {"access_token": self.access_token, **(params or {})}
-        _debug_log(f"GET {self._url(path)} params={self._sanitize_payload(final_params)}")
-        response = requests.get(self._url(path), params=final_params, timeout=120)
-        return self._handle(response)
+        return self._request("get", self._url(path), params=final_params)
 
     def post(
         self,
@@ -85,17 +98,11 @@ class MetaClient:
         files: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         final_data = {"access_token": self.access_token, **(data or {})}
-        _debug_log(
-            f"POST {self._url(path)} data={self._sanitize_payload(final_data)} files={sorted((files or {}).keys())}"
-        )
-        response = requests.post(self._url(path), data=final_data, files=files, timeout=300)
-        return self._handle(response)
+        return self._request("post", self._url(path), data=final_data, files=files)
 
     def delete(self, path: str) -> dict[str, Any]:
         params = {"access_token": self.access_token}
-        _debug_log(f"DELETE {self._url(path)}")
-        response = requests.delete(self._url(path), params=params, timeout=120)
-        return self._handle(response)
+        return self._request("delete", self._url(path), params=params)
 
     def paginate(
         self,
@@ -111,9 +118,7 @@ class MetaClient:
         while url:
             if max_pages is not None and page >= max_pages:
                 break
-            _debug_log(f"GET {url} params={self._sanitize_payload(next_params)}")
-            response = requests.get(url, params=next_params, timeout=120)
-            payload = self._handle(response)
+            payload = self._request("get", url, params=next_params)
             items.extend(payload.get("data") or [])
             url = ((payload.get("paging") or {}).get("next")) or None
             next_params = None

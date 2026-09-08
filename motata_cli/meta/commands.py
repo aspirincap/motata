@@ -17,6 +17,37 @@ from typing import Any
 
 import requests
 
+from motata_cli.common import config as common_config
+from motata_cli.common.config import CACHE_DIR, CONFIG_PATH, JOBS_DIR
+from motata_cli.common.errors import CliError
+from motata_cli.common.utils import (
+    env_first,
+    now_ts,
+    normalize_account_id,
+    load_json_file,
+    write_json_file,
+    normalize_name,
+    json_or_none,
+    json_compact,
+    parse_json_option,
+    parse_positive_int,
+    parse_positive_int_str,
+    validate_name,
+    validate_non_empty,
+    validate_iso_datetime,
+    validate_domain,
+    parse_fields,
+    filter_empty,
+)
+from motata_cli.common.auth import (
+    AuthContext,
+    resolve_auth,
+)
+from motata_cli.meta.utils import (
+    ad_account_path,
+    parse_meta_error_payload,
+)
+
 from motata_cli import __version__
 from motata_cli.meta.app_discovery import build_meta_app_report
 from motata_cli.meta.activities import build_meta_activities_report
@@ -26,6 +57,8 @@ from motata_cli.meta.landing_pages import build_landing_page_report
 from motata_cli.meta.metrics import build_meta_metric_probe
 from motata_cli.meta.output import print_output
 from motata_cli.meta.payloads import (
+    BID_STRATEGIES_REQUIRING_BID_CAP,
+    BID_STRATEGY_MIN_ROAS,
     build_ad_payload,
     build_adset_payload,
     build_campaign_payload,
@@ -45,16 +78,17 @@ from motata_cli.meta.preflight import (
     validate_target_app_ad_links,
     validate_target_promoted_objects,
 )
+from motata_cli.meta.services import media as media_service
 from motata_cli.meta.user_type import build_user_type_report
 from motata_cli.meta.services import (
     build_auth_from_args,
-    build_migration_plan_summary,
+    build_migration_plan_summary as _build_migration_plan_summary,
     cleanup_object,
     create_ad,
     create_adset,
     create_campaign,
     create_creative,
-    export_migration_bundle,
+    export_migration_bundle as _export_migration_bundle,
     get_entity,
     list_entities,
     run_migration_flow,
@@ -62,612 +96,59 @@ from motata_cli.meta.services import (
 )
 
 
-def env_first(*names: str, default: str | None = None) -> str | None:
-    for name in names:
-        value = os.environ.get(name)
-        if value not in (None, ""):
-            return value
-    return default
-
-META_VERSION = env_first("MOTATA_META_VERSION", default="v23.0")
-META_BASE_URL = f"https://graph.facebook.com/{META_VERSION}"
-META_VIDEO_BASE_URL = f"https://graph-video.facebook.com/{META_VERSION}"
-CACHE_DIR = Path(env_first("MOTATA_HOME", default=str(Path.home() / ".motata"))).expanduser()
-CONFIG_PATH = CACHE_DIR / "config.json"
-JOBS_DIR = CACHE_DIR / "jobs"
-VIDEO_CHUNKED_THRESHOLD = 20 * 1024 * 1024
-VIDEO_MAX_CHUNK_WINDOW_SIZE = 5 * 1024 * 1024
-VIDEO_MAX_FILE_SIZE = 4_000_000_000
-VIDEO_MAX_RETRIES = 5
-VIDEO_RETRY_BASE_DELAY_MS = 1000
-VIDEO_RETRY_MAX_DELAY_MS = 60_000
-VIDEO_RETRYABLE_META_CODES = {1, 2, 4, 17, 32, 80, 613}
-BID_STRATEGIES_REQUIRING_BID_CAP = {"LOWEST_COST_WITH_BID_CAP", "COST_CAP"}
-BID_STRATEGY_MIN_ROAS = "LOWEST_COST_WITH_MIN_ROAS"
+# Compatibility re-exports; implementations live below the CLI layer.
+from motata_cli.meta.services.media import (
+    META_VERSION, META_BASE_URL, META_VIDEO_BASE_URL,
+    VIDEO_CHUNKED_THRESHOLD, VIDEO_MAX_CHUNK_WINDOW_SIZE, VIDEO_MAX_FILE_SIZE,
+    VIDEO_MAX_RETRIES, VIDEO_RETRY_BASE_DELAY_MS, VIDEO_RETRY_MAX_DELAY_MS,
+    VIDEO_RETRYABLE_META_CODES, is_retryable_video_error, retry_delay_seconds,
+    parse_upload_offset, file_tuple, upload_image, build_video_client,
+    video_post_with_retry, single_upload_video, chunked_upload_video, upload_video,
+    wait_for_video_thumbnail,
+)
+from motata_cli.meta.services.migration_assets import (
+    load_required_migration_export, referenced_creatives_from_asset_tree,
+    first_by_name, first_creative_by_prefix,
+    MIGRATION_EXPORT_CAMPAIGN_FIELDS, MIGRATION_EXPORT_ADSET_FIELDS,
+    MIGRATION_EXPORT_AD_FIELDS, MIGRATION_EXPORT_CREATIVE_FIELDS,
+)
+from motata_cli.meta.services.discovery import infer_promotable_pages, discover_pixels
 
 
-class CliError(RuntimeError):
-    pass
+def export_migration_bundle(meta: MetaClient, *, source_account_id: str,
+                            campaign_ids: list[str], export_dir: Path,
+                            commands_module: Any = None) -> dict[str, Any]:
+    return _export_migration_bundle(
+        meta, source_account_id=source_account_id, campaign_ids=campaign_ids,
+        export_dir=export_dir,
+        commands_module=commands_module if commands_module is not None else sys.modules[__name__],
+    )
 
 
-@dataclass
-class AuthContext:
-    account_id: str
-    media_code: str
-    access_token: str
-    expires_at: int | None
-    source: str
+def build_migration_plan_summary(*, export_dir: Path, source_account_id: str,
+                                 target_account_id: str, target_meta: MetaClient,
+                                 commands_module: Any = None) -> dict[str, Any]:
+    return _build_migration_plan_summary(
+        export_dir=export_dir, source_account_id=source_account_id,
+        target_account_id=target_account_id, target_meta=target_meta,
+        commands_module=commands_module if commands_module is not None else sys.modules[__name__],
+    )
 
 
 def ensure_dirs() -> None:
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    JOBS_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def now_ts() -> int:
-    return int(time.time())
-
-
-def normalize_account_id(account_id: str) -> str:
-    account_id = str(account_id).strip()
-    return account_id[4:] if account_id.startswith("act_") else account_id
-
-
-def ad_account_path(account_id: str) -> str:
-    account_id = normalize_account_id(account_id)
-    return f"act_{account_id}"
-
-
-def load_json_file(path: Path, default: Any = None) -> Any:
-    if not path.exists():
-        return default
-    return json.loads(path.read_text())
-
-
-def write_json_file(path: Path, payload: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
-
-
-def load_required_migration_export(export_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
-    asset_tree_path = export_dir / "asset-tree.json"
-    creatives_path = export_dir / "creatives.raw.json"
-    missing = [str(path) for path in (asset_tree_path, creatives_path) if not path.exists()]
-    if missing:
-        raise CliError(
-            "Migration export is incomplete. Expected files:\n"
-            f"- {asset_tree_path}\n"
-            f"- {creatives_path}\n"
-            f"Missing: {', '.join(missing)}\n"
-            "Generate them with `motata meta migrate export`, then rerun the migration command."
-        )
-
-    asset_tree = load_json_file(asset_tree_path)
-    creatives = load_json_file(creatives_path)
-    if not isinstance(asset_tree, dict) or not isinstance(asset_tree.get("tree"), list):
-        raise CliError(f"Invalid migration export: {asset_tree_path} must contain a top-level 'tree' list.")
-    if not isinstance(creatives, dict):
-        raise CliError(f"Invalid migration export: {creatives_path} must contain a JSON object keyed by creative ID.")
-    return asset_tree, creatives
-
-
-MIGRATION_EXPORT_CAMPAIGN_FIELDS = [
-    "id",
-    "name",
-    "objective",
-    "status",
-    "daily_budget",
-    "lifetime_budget",
-    "bid_strategy",
-    "special_ad_categories",
-]
-MIGRATION_EXPORT_ADSET_FIELDS = [
-    "id",
-    "name",
-    "campaign_id",
-    "status",
-    "effective_status",
-    "optimization_goal",
-    "billing_event",
-    "promoted_object",
-    "targeting",
-    "daily_budget",
-    "lifetime_budget",
-    "bid_amount",
-    "bid_strategy",
-    "bid_constraints",
-    "start_time",
-    "end_time",
-    "destination_type",
-]
-MIGRATION_EXPORT_AD_FIELDS = [
-    "id",
-    "name",
-    "campaign_id",
-    "adset_id",
-    "status",
-    "effective_status",
-    "bid_amount",
-    "creative",
-]
-MIGRATION_EXPORT_CREATIVE_FIELDS = [
-    "id",
-    "name",
-    "object_story_spec",
-    "object_story_id",
-    "asset_feed_spec",
-    "media_sourcing_spec",
-    "url_tags",
-    "thumbnail_url",
-    "image_url",
-    "link_url",
-    "body",
-    "title",
-    "call_to_action_type",
-    "object_type",
-    "actor_id",
-]
-
-
-def normalize_name(value: str | None) -> str:
-    text = unicodedata.normalize("NFKC", value or "").replace("\ufffd", " ")
-    text = "".join(" " if unicodedata.category(ch) == "So" else ch for ch in text)
-    text = re.sub(r"\s+", " ", text).strip().lower()
-    return text
-
-
-def json_or_none(raw: str | None) -> Any:
-    if not raw:
-        return None
-    return json.loads(raw)
-
-
-def json_compact(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-
-
-def parse_json_option(raw: Any, label: str, expected_type: type | tuple[type, ...] | None = None) -> Any:
-    if raw in (None, ""):
-        return None
-    value = raw
-    if isinstance(raw, str):
-        try:
-            value = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise CliError(f"Invalid {label} JSON: {exc.msg}") from exc
-    if expected_type and not isinstance(value, expected_type):
-        if isinstance(expected_type, tuple):
-            names = ", ".join(t.__name__ for t in expected_type)
-        else:
-            names = expected_type.__name__
-        raise CliError(f"Invalid {label}: expected {names}")
-    return value
-
-
-def parse_positive_int(value: Any, label: str) -> int | None:
-    if value in (None, ""):
-        return None
-    try:
-        parsed = int(str(value))
-    except (TypeError, ValueError) as exc:
-        raise CliError(f"Invalid {label}: expected a positive integer") from exc
-    if parsed <= 0:
-        raise CliError(f"Invalid {label}: expected a positive integer")
-    return parsed
-
-
-def parse_positive_int_str(value: Any, label: str) -> str | None:
-    parsed = parse_positive_int(value, label)
-    return str(parsed) if parsed is not None else None
-
-
-def validate_name(value: str | None, label: str) -> str | None:
-    if value is None:
-        return None
-    normalized = str(value).strip()
-    if not normalized:
-        raise CliError(f"{label} cannot be empty")
-    if len(normalized) > 400:
-        raise CliError(f"{label} exceeds 400 characters")
-    return normalized
-
-
-def validate_non_empty(value: str | None, label: str) -> str:
-    normalized = validate_name(value, label)
-    if normalized is None:
-        raise CliError(f"Missing {label}")
-    return normalized
-
-
-def validate_iso_datetime(value: str | None, label: str) -> str | None:
-    if value in (None, ""):
-        return None
-    normalized = str(value).strip()
-    try:
-        datetime.fromisoformat(normalized.replace("Z", "+00:00"))
-    except ValueError as exc:
-        raise CliError(f"Invalid {label}: expected ISO 8601 datetime") from exc
-    return normalized
-
-
-def validate_domain(value: str | None, label: str) -> str | None:
-    if value in (None, ""):
-        return None
-    normalized = str(value).strip().lower()
-    if not re.fullmatch(r"(?:[a-z0-9-]+\.)+[a-z]{2,63}", normalized):
-        raise CliError(f"Invalid {label}: expected a domain like example.com")
-    return normalized
-
-
-def parse_meta_error_payload(exc: Exception) -> dict[str, Any] | None:
-    if not isinstance(exc, CliError):
-        return None
-    try:
-        payload = json.loads(str(exc))
-    except json.JSONDecodeError:
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
-def is_retryable_video_error(exc: Exception) -> bool:
-    if isinstance(exc, (requests.Timeout, requests.ConnectionError)):
-        return True
-    payload = parse_meta_error_payload(exc)
-    code = payload.get("code") if payload else None
-    return code in VIDEO_RETRYABLE_META_CODES
-
-
-def retry_delay_seconds(attempt: int) -> float:
-    base = VIDEO_RETRY_BASE_DELAY_MS * (2 ** (attempt - 1))
-    capped = min(base, VIDEO_RETRY_MAX_DELAY_MS)
-    return (capped * (0.8 + (0.4 * (time.time() % 1)))) / 1000.0
-
-
-def parse_upload_offset(value: Any, label: str) -> int:
-    if value in (None, ""):
-        raise CliError(f"Invalid {label} returned by video upload API: {value}")
-    try:
-        parsed = int(str(value))
-    except (TypeError, ValueError) as exc:
-        raise CliError(f"Invalid {label} returned by video upload API: {value}") from exc
-    if parsed < 0:
-        raise CliError(f"Invalid {label} returned by video upload API: {value}")
-    return parsed
+    common_config.ensure_dirs(cache_dir=CACHE_DIR, jobs_dir=JOBS_DIR)
 
 
 def load_config() -> dict[str, Any]:
-    ensure_dirs()
-    return load_json_file(CONFIG_PATH, default={"values": {}, "account_aliases": {}})
+    return common_config.load_config(config_path=CONFIG_PATH, cache_dir=CACHE_DIR, jobs_dir=JOBS_DIR)
 
 
 def save_config(payload: dict[str, Any]) -> None:
-    ensure_dirs()
-    write_json_file(CONFIG_PATH, payload)
+    common_config.save_config(payload, config_path=CONFIG_PATH, cache_dir=CACHE_DIR, jobs_dir=JOBS_DIR)
 
 
 def resolve_account_ref(account_ref: str | None) -> str | None:
-    if not account_ref:
-        config = load_config()
-        default_account = (config.get("values") or {}).get("default_account")
-        if default_account:
-            return normalize_account_id(default_account)
-        return None
-    raw = str(account_ref).strip()
-    if raw.startswith("act_") or raw.isdigit():
-        return normalize_account_id(raw)
-    config = load_config()
-    aliases = config.get("account_aliases") or {}
-    mapped = aliases.get(raw)
-    if isinstance(mapped, dict):
-        mapped = mapped.get("account_id")
-    if mapped:
-        return normalize_account_id(mapped)
-    return normalize_account_id(raw)
-
-
-def resolve_auth(
-    *,
-    account_id: str,
-    media_code: str = "facebook",
-    access_token: str | None = None,
-) -> AuthContext:
-    if access_token:
-        return AuthContext(
-            account_id=normalize_account_id(account_id) if account_id else "",
-            media_code=media_code,
-            access_token=access_token,
-            expires_at=None,
-            source="direct",
-        )
-    raise CliError(
-        "Missing access token. Fetch one with the motata token skill "
-        "and pass it via --access-token."
-    )
-
-
-def first_by_name(items: list[dict[str, Any]], name: str) -> dict[str, Any] | None:
-    target = normalize_name(name)
-    for item in items:
-        current = normalize_name(item.get("name"))
-        if current == target or current.startswith(target):
-            return item
-    return None
-
-
-def first_creative_by_prefix(items: list[dict[str, Any]], name: str, page_id: str | None) -> dict[str, Any] | None:
-    target = normalize_name(name)
-    for item in items:
-        item_page = str(((item.get("object_story_spec") or {}).get("page_id")) or "")
-        if page_id and item_page and item_page != str(page_id):
-            continue
-        if normalize_name(item.get("name")).startswith(target):
-            return item
-    return None
-
-
-def infer_promotable_pages(meta: MetaClient, account_id: str) -> dict[str, Any]:
-    account = ad_account_path(account_id)
-    visible_pages = meta.paginate(
-        "me/accounts",
-        params={"fields": "id,name,tasks,instagram_business_account{id,username},connected_instagram_account{id,username}", "limit": 200},
-    )
-    creatives = meta.paginate(
-        f"{account}/adcreatives",
-        params={"fields": "id,name,object_story_spec{page_id,instagram_user_id}", "limit": 50},
-    )
-    ads = meta.paginate(
-        f"{account}/ads",
-        params={"fields": "id,name,creative{id,name,object_story_spec{page_id,instagram_user_id}}", "limit": 50},
-    )
-
-    visible_map = {str(page["id"]): page for page in visible_pages}
-    creative_pages: dict[str, dict[str, Any]] = {}
-    ad_pages: dict[str, dict[str, Any]] = {}
-    ig_ids: set[str] = set()
-
-    for creative in creatives:
-        oss = creative.get("object_story_spec") or {}
-        page_id = str(oss.get("page_id") or "")
-        if not page_id:
-            continue
-        creative_pages.setdefault(page_id, {"count": 0, "samples": []})
-        creative_pages[page_id]["count"] += 1
-        if len(creative_pages[page_id]["samples"]) < 5:
-            creative_pages[page_id]["samples"].append({"id": creative["id"], "name": creative.get("name")})
-        ig = oss.get("instagram_user_id")
-        if ig:
-            ig_ids.add(str(ig))
-
-    for ad in ads:
-        creative = ad.get("creative") or {}
-        oss = creative.get("object_story_spec") or {}
-        page_id = str(oss.get("page_id") or "")
-        if not page_id:
-            continue
-        ad_pages.setdefault(page_id, {"count": 0, "samples": []})
-        ad_pages[page_id]["count"] += 1
-        if len(ad_pages[page_id]["samples"]) < 5:
-            ad_pages[page_id]["samples"].append(
-                {
-                    "ad_id": ad["id"],
-                    "ad_name": ad.get("name"),
-                    "creative_id": creative.get("id"),
-                    "creative_name": creative.get("name"),
-                }
-            )
-        ig = oss.get("instagram_user_id")
-        if ig:
-            ig_ids.add(str(ig))
-
-    all_page_ids = sorted(set(visible_map) | set(creative_pages) | set(ad_pages))
-    pages: list[dict[str, Any]] = []
-    for page_id in all_page_ids:
-        visible = visible_map.get(page_id)
-        pages.append(
-            {
-                "page_id": page_id,
-                "name": (visible or {}).get("name"),
-                "token_visible": page_id in visible_map,
-                "creative_seen": page_id in creative_pages,
-                "ad_attach_usable": page_id in ad_pages,
-                "creative_count": (creative_pages.get(page_id) or {}).get("count", 0),
-                "ad_count": (ad_pages.get(page_id) or {}).get("count", 0),
-                "tasks": (visible or {}).get("tasks", []),
-                "instagram_business_account": (visible or {}).get("instagram_business_account"),
-                "connected_instagram_account": (visible or {}).get("connected_instagram_account"),
-                "creative_samples": (creative_pages.get(page_id) or {}).get("samples", []),
-                "ad_samples": (ad_pages.get(page_id) or {}).get("samples", []),
-            }
-        )
-
-    return {
-        "account_id": account,
-        "token_visible_pages": visible_pages,
-        "pages": pages,
-        "instagram_user_ids_seen": sorted(ig_ids),
-    }
-
-
-def discover_pixels(meta: MetaClient, account_id: str) -> list[dict[str, Any]]:
-    return meta.paginate(
-        f"{ad_account_path(account_id)}/adspixels",
-        params={"fields": "id,name,owner_ad_account,creation_time,last_fired_time,is_created_by_business", "limit": 200},
-    )
-
-
-def file_tuple(path: Path, field_name: str) -> tuple[str, Any, str]:
-    mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-    return (path.name, path.open("rb"), mime)
-
-
-def upload_image(meta: MetaClient, account_id: str, file_path: str, name: str | None = None) -> dict[str, Any]:
-    path = Path(file_path)
-    if not path.exists():
-        raise CliError(f"Image file not found: {path}")
-    with path.open("rb") as handle:
-        payload = meta.post(
-            f"{ad_account_path(account_id)}/adimages",
-            data={"name": name or path.name},
-            files={"bytes": (path.name, handle, mimetypes.guess_type(path.name)[0] or "application/octet-stream")},
-        )
-    images = payload.get("images") or {}
-    if images:
-        first = next(iter(images.values()))
-        return {"id": first.get("hash"), "type": "image", **first, "raw": payload}
-    return {"id": payload.get("hash"), "type": "image", "raw": payload}
-
-
-def build_video_client(meta: MetaClient) -> MetaClient:
-    return MetaClient(meta.access_token, version=META_VERSION, base_url=META_VIDEO_BASE_URL, error_factory=meta.error_factory)
-
-
-def video_post_with_retry(
-    video_meta: MetaClient,
-    path: str,
-    *,
-    data: dict[str, Any] | None = None,
-    files: dict[str, Any] | None = None,
-    attempt: int = 1,
-    context: str,
-) -> dict[str, Any]:
-    try:
-        return video_meta.post(path, data=data, files=files)
-    except Exception as exc:
-        if attempt >= VIDEO_MAX_RETRIES or not is_retryable_video_error(exc):
-            raise CliError(f"{context} failed: {exc}") from exc
-        time.sleep(retry_delay_seconds(attempt))
-        return video_post_with_retry(
-            video_meta,
-            path,
-            data=data,
-            files=files,
-            attempt=attempt + 1,
-            context=context,
-        )
-
-
-def single_upload_video(
-    video_meta: MetaClient,
-    account_id: str,
-    file_path: Path,
-    *,
-    name: str | None,
-    title: str | None,
-) -> dict[str, Any]:
-    file_bytes = file_path.read_bytes()
-    mime = mimetypes.guess_type(file_path.name)[0] or "video/mp4"
-    payload = video_post_with_retry(
-        video_meta,
-        f"{ad_account_path(account_id)}/advideos",
-        data=filter_empty({"name": name or file_path.name, "title": title}),
-        files={"source": (file_path.name, file_bytes, mime)},
-        context=f"Single video upload for {file_path.name}",
-    )
-    return {"id": payload.get("id") or payload.get("video_id"), "type": "video", **payload, "raw": payload}
-
-
-def chunked_upload_video(
-    video_meta: MetaClient,
-    account_id: str,
-    file_path: Path,
-    *,
-    name: str | None,
-    title: str | None,
-) -> dict[str, Any]:
-    file_size = file_path.stat().st_size
-    endpoint = f"{ad_account_path(account_id)}/advideos"
-    start_result = video_post_with_retry(
-        video_meta,
-        endpoint,
-        data={"upload_phase": "start", "file_size": str(file_size)},
-        context=f"Video upload start for {file_path.name}",
-    )
-    upload_session_id = start_result.get("upload_session_id")
-    if not upload_session_id:
-        raise CliError(f"Video upload start did not return upload_session_id: {json.dumps(start_result, ensure_ascii=False)}")
-    video_id = start_result.get("video_id")
-    start_offset = parse_upload_offset(start_result.get("start_offset"), "start_offset")
-    end_offset = parse_upload_offset(start_result.get("end_offset"), "end_offset")
-    with file_path.open("rb") as handle:
-        while start_offset != end_offset:
-            if end_offset < start_offset:
-                raise CliError(f"Invalid upload window returned by video upload API: {start_offset}-{end_offset}")
-            chunk_size = end_offset - start_offset
-            if chunk_size > VIDEO_MAX_CHUNK_WINDOW_SIZE:
-                raise CliError(
-                    f"Upload chunk window {chunk_size} exceeds supported maximum {VIDEO_MAX_CHUNK_WINDOW_SIZE} bytes"
-                )
-            handle.seek(start_offset)
-            buffer = handle.read(chunk_size)
-            if len(buffer) != chunk_size:
-                raise CliError(
-                    f"Failed to read {chunk_size} bytes for upload chunk at offset {start_offset}; read {len(buffer)} bytes"
-                )
-            transfer_result = video_post_with_retry(
-                video_meta,
-                endpoint,
-                data={
-                    "upload_phase": "transfer",
-                    "upload_session_id": str(upload_session_id),
-                    "start_offset": str(start_offset),
-                },
-                files={"video_file_chunk": ("chunk", buffer, "application/octet-stream")},
-                context=f"Video chunk upload at offset {start_offset}",
-            )
-            start_offset = parse_upload_offset(transfer_result.get("start_offset"), "start_offset")
-            end_offset = parse_upload_offset(transfer_result.get("end_offset"), "end_offset")
-    finish_result = video_post_with_retry(
-        video_meta,
-        endpoint,
-        data=filter_empty(
-            {
-                "upload_phase": "finish",
-                "upload_session_id": str(upload_session_id),
-                "title": title,
-                "name": name or file_path.name,
-            }
-        ),
-        context=f"Video upload finish for {file_path.name}",
-    )
-    payload = {"id": finish_result.get("video_id") or video_id, "type": "video", **finish_result, "raw": finish_result}
-    if payload.get("id") is None and video_id:
-        payload["id"] = video_id
-    return payload
-
-
-def upload_video(
-    meta: MetaClient,
-    account_id: str,
-    file_path: str,
-    name: str | None = None,
-    thumbnail_path: str | None = None,
-    title: str | None = None,
-) -> dict[str, Any]:
-    path = Path(file_path)
-    if not path.exists():
-        raise CliError(f"Video file not found: {path}")
-    file_size = path.stat().st_size
-    if file_size > VIDEO_MAX_FILE_SIZE:
-        raise CliError(f"File exceeds 4 GB maximum ({file_size} bytes).")
-    video_meta = build_video_client(meta)
-    if file_size <= VIDEO_CHUNKED_THRESHOLD:
-        payload = single_upload_video(video_meta, account_id, path, name=name, title=title)
-    else:
-        payload = chunked_upload_video(video_meta, account_id, path, name=name, title=title)
-    if thumbnail_path:
-        thumb = Path(thumbnail_path)
-        if not thumb.exists():
-            raise CliError(f"Thumbnail file not found: {thumb}")
-    return payload
-
-
-def parse_fields(fields: list[str] | None, default: list[str]) -> str:
-    return ",".join(fields or default)
-
-
-def filter_empty(payload: dict[str, Any]) -> dict[str, Any]:
-    return {key: value for key, value in payload.items() if value not in (None, "", [], {})}
-
+    return common_config.resolve_account_ref(account_ref, config_loader=load_config)
 
 
 def build_meta(args: argparse.Namespace) -> MetaClient:
@@ -793,36 +274,6 @@ def command_pages_instagram(args: argparse.Namespace) -> None:
             "hint": "No Instagram account found. The page may have no linked Instagram account, or the token may be missing instagram_basic permission.",
         },
         as_json=True,
-    )
-
-
-def wait_for_video_thumbnail(
-    meta: MetaClient,
-    account_id: str,
-    video_id: str,
-    *,
-    timeout_seconds: int = 180,
-    poll_seconds: int = 5,
-) -> dict[str, Any]:
-    deadline = time.time() + timeout_seconds
-    last_payload: dict[str, Any] | None = None
-    while time.time() < deadline:
-        payload = meta.get(
-            video_id,
-            params={"fields": "id,status,thumbnails{uri,is_preferred}"},
-        )
-        last_payload = payload
-        thumbnails = (payload.get("thumbnails") or {}).get("data") or []
-        if thumbnails:
-            preferred = next((row for row in thumbnails if row.get("is_preferred")), thumbnails[0])
-            return {"thumbnail_url": preferred.get("uri"), "video_status": (payload.get("status") or {}).get("video_status")}
-        status = payload.get("status") or {}
-        if status.get("video_status") in {"error", "failed"}:
-            break
-        time.sleep(poll_seconds)
-    raise CliError(
-        f"Could not auto-resolve thumbnail for video {video_id}. "
-        f"Last status: {json.dumps(last_payload or {}, ensure_ascii=False)}"
     )
 
 
@@ -1374,113 +825,25 @@ def command_debug_graph(args: argparse.Namespace) -> None:
     print_output(payload, as_json=True)
 
 
-def referenced_creatives_from_asset_tree(asset_tree: dict[str, Any], creatives: dict[str, Any]) -> dict[str, Any]:
-    referenced_ids: set[str] = set()
-    for campaign_node in asset_tree["tree"]:
-        for adset_node in campaign_node["adsets"]:
-            for ad_node in adset_node["ads"]:
-                creative = ad_node["creative"]
-                referenced_ids.add(str(creative["id"]))
-    return {cid: creatives[cid] for cid in referenced_ids if cid in creatives}
+pick_link = media_service.pick_link
 
 
-def pick_link(creative: dict[str, Any]) -> str | None:
-    oss = creative.get("object_story_spec") or {}
-    video_data = oss.get("video_data") or {}
-    cta = (video_data.get("call_to_action") or {}).get("value") or {}
-    return (
-        cta.get("link")
-        or (oss.get("link_data") or {}).get("link")
-        or (oss.get("template_data") or {}).get("link")
-        or (((oss.get("photo_data") or {}).get("call_to_action") or {}).get("value") or {}).get("link")
-        or creative.get("link_url")
-        or (((creative.get("asset_feed_spec") or {}).get("link_urls") or [{}])[0].get("website_url"))
-    )
+pick_creative_thumbnail_url = media_service.pick_creative_thumbnail_url
 
 
-def pick_creative_thumbnail_url(creative: dict[str, Any]) -> str | None:
-    oss = creative.get("object_story_spec") or {}
-    video_data = oss.get("video_data") or {}
-    link_data = oss.get("link_data") or {}
-    photo_data = oss.get("photo_data") or {}
-    template_data = oss.get("template_data") or {}
-    return (
-        video_data.get("image_url")
-        or photo_data.get("image_url")
-        or (((photo_data.get("call_to_action") or {}).get("value") or {}).get("image_url"))
-        or creative.get("thumbnail_url")
-        or creative.get("image_url")
-        or (((template_data.get("call_to_action") or {}).get("value") or {}).get("image_url"))
-        or (((link_data.get("call_to_action") or {}).get("value") or {}).get("image_url"))
-    )
-
-
-def pick_creative_text_parts(creative: dict[str, Any]) -> dict[str, str | None]:
-    oss = creative.get("object_story_spec") or {}
-    video_data = oss.get("video_data") or {}
-    link_data = oss.get("link_data") or {}
-    photo_data = oss.get("photo_data") or {}
-    template_data = oss.get("template_data") or {}
-    return {
-        "message": (
-            video_data.get("message")
-            or link_data.get("message")
-            or photo_data.get("message")
-            or template_data.get("message")
-            or creative.get("body")
-        ),
-        "headline": (
-            video_data.get("title")
-            or link_data.get("name")
-            or photo_data.get("name")
-            or template_data.get("name")
-            or creative.get("title")
-        ),
-        "description": (
-            video_data.get("link_description")
-            or link_data.get("description")
-            or photo_data.get("caption")
-            or template_data.get("description")
-        ),
-        "call_to_action": (
-            ((video_data.get("call_to_action") or {}).get("type"))
-            or ((link_data.get("call_to_action") or {}).get("type"))
-            or ((photo_data.get("call_to_action") or {}).get("type"))
-            or ((template_data.get("call_to_action") or {}).get("type"))
-            or creative.get("call_to_action_type")
-            or "SHOP_NOW"
-        ),
-    }
+pick_creative_text_parts = media_service.pick_creative_text_parts
 
 
 def detect_creative_migration_mode(creative: dict[str, Any]) -> str:
-    oss = creative.get("object_story_spec") or {}
-    if ((oss.get("video_data") or {}).get("video_id")):
-        return "video"
-    if creative.get("object_story_id"):
-        return "existing_post"
-    if pick_link(creative):
-        return "link"
-    raise CliError(
-        f"Unsupported creative format for migration: creative {creative.get('id')} "
-        "has neither video_data.video_id, object_story_id, nor a resolvable link."
-    )
+    # Preserve the historical commands.pick_link patch seam without reverse imports.
+    return media_service.detect_creative_migration_mode(creative, link_picker=pick_link)
 
 
-def local_media_extension_from_url(url: str | None, default: str = ".jpg") -> str:
-    if not url:
-        return default
-    suffix = Path(url.split("?", 1)[0]).suffix.lower()
-    return suffix if suffix in {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"} else default
+local_media_extension_from_url = media_service.local_media_extension_from_url
 
 
 def download_file(url: str, dest: Path) -> None:
-    with requests.get(url, stream=True, timeout=300) as response:
-        response.raise_for_status()
-        with dest.open("wb") as handle:
-            for chunk in response.iter_content(chunk_size=1024 * 1024):
-                if chunk:
-                    handle.write(chunk)
+    return media_service.download_file(url, dest, get=requests.get)
 
 
 def save_job(job_id: str, payload: dict[str, Any]) -> Path:
@@ -1517,23 +880,33 @@ def command_migrate_plan(args: argparse.Namespace) -> None:
 
 
 def command_migrate_run(args: argparse.Namespace) -> None:
-    result = run_migration_flow(args, commands_module=sys.modules[__name__])
+    from motata_cli.meta.services.migration_state import MigrationStateError
+
+    try:
+        result = run_migration_flow(args, commands_module=sys.modules[__name__])
+    except MigrationStateError as exc:
+        raise CliError(str(exc)) from exc
     print_output(result, as_json=True)
 
 
 def command_migrate_status(args: argparse.Namespace) -> None:
-    job_path = JOBS_DIR / f"{args.job_id}.json"
-    if not job_path.exists():
-        raise CliError(f"Job not found: {args.job_id}")
-    print_output(load_json_file(job_path), as_json=True)
+    from motata_cli.meta.services.migration_state import job_path, load_job, MigrationStateError
+
+    try:
+        job = load_job(job_path(JOBS_DIR, args.job_id))
+    except MigrationStateError as exc:
+        raise CliError(str(exc)) from exc
+    print_output(job, as_json=True)
 
 
 def command_migrate_resume(args: argparse.Namespace) -> None:
-    job_path = JOBS_DIR / f"{args.job_id}.json"
-    if not job_path.exists():
-        raise CliError(f"Job not found: {args.job_id}")
-    job = load_json_file(job_path)
-    config = job.get("config") or {}
+    from motata_cli.meta.services.migration_state import job_path, load_job, MigrationStateError
+
+    try:
+        job = load_job(job_path(JOBS_DIR, args.job_id))
+    except MigrationStateError as exc:
+        raise CliError(str(exc)) from exc
+    config = job["config"]
     rerun = argparse.Namespace(
         export_dir=config["export_dir"],
         source_account_id=config["source_account_id"],
@@ -1548,6 +921,7 @@ def command_migrate_resume(args: argparse.Namespace) -> None:
         source_access_token=args.source_access_token,
         target_access_token=args.target_access_token,
         job_id=args.job_id,
+        _resume=True,
     )
     command_migrate_run(rerun)
 

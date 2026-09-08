@@ -336,7 +336,6 @@ class MetaMigrateRuntimeBehaviorTests(unittest.TestCase):
         source_meta = FakeMeta()
         target_meta = FakeMeta()
         printed: list[dict[str, object]] = []
-        saved_jobs: list[dict[str, object]] = []
 
         with tempfile.TemporaryDirectory() as tmpdir:
             export_dir = Path(tmpdir)
@@ -366,22 +365,20 @@ class MetaMigrateRuntimeBehaviorTests(unittest.TestCase):
                 patch("motata_cli.meta.commands.validate_target_promoted_objects"),
                 patch("motata_cli.meta.commands.validate_target_app_ad_links"),
                 patch("motata_cli.meta.commands.write_json_file"),
-                patch(
-                    "motata_cli.meta.commands.save_job",
-                    side_effect=lambda job_id, payload: saved_jobs.append(payload) or Path("/tmp/job-1.json"),
-                ),
+                patch("motata_cli.meta.commands.JOBS_DIR", export_dir / "jobs"),
                 patch(
                     "motata_cli.meta.commands.print_output",
                     side_effect=lambda payload, as_json=False: printed.append(payload),
                 ),
             ):
                 command_migrate_run(args)
+                saved_job = json.loads((export_dir / "jobs/job-1.json").read_text())
 
         self.assertEqual(target_meta.get_calls, [])
         self.assertEqual(len(printed), 1)
         self.assertIsNone(printed[0]["target_instagram_user_id"])
-        self.assertEqual(len(saved_jobs), 1)
-        self.assertIsNone(saved_jobs[0]["config"]["instagram_user_id"])
+        self.assertEqual(saved_job["status"], "completed")
+        self.assertIsNone(saved_job["config"]["instagram_user_id"])
 
 
 if __name__ == "__main__":

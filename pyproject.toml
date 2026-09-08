@@ -8,6 +8,8 @@ dependencies = [
   "beautifulsoup4>=4.12.0,<5",
   "requests>=2.31.0,<3",
   "six>=1.16.0,<2",
+  "certifi>=2023.7.22",
+  "urllib3>=1.26.18,<3",
 ]
 
 [project.scripts]
@@ -19,6 +21,9 @@ motata-auth-center-token = "motata_cli.auth_center.fetch_token:main"
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-data]
+motata_cli = ["skills_compatibility.json", "_vendor/NOTICE.md", "_vendor/tiktok_business_api_sdk/LICENSE"]
 
 [tool.setuptools.packages.find]
 include = ["motata_cli*"]

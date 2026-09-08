@@ -1,0 +1,13 @@
+# Pinned build/test dependency set. Application consumers retain pyproject ranges.
+setuptools==82.0.0
+wheel==0.45.1
+packaging==26.0
+requests==2.32.5
+beautifulsoup4==4.14.3
+six==1.17.0
+certifi==2025.11.12
+urllib3==2.6.3
+charset-normalizer==3.4.4
+idna==3.11
+soupsieve==2.8.3
+typing-extensions==4.15.0

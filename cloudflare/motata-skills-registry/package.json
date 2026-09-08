@@ -1,0 +1,13 @@
+{
+  "name": "motata-skills-registry",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Cloudflare Pages project for the Motata skills registry and compatibility manifest.",
+  "scripts": {
+    "build": "python3 ../../scripts/build_skill_registry.py",
+    "deploy": "npm run build && wrangler pages deploy public --project-name motata-skills"
+  },
+  "devDependencies": {
+    "wrangler": "^4.104.0"
+  }
+}

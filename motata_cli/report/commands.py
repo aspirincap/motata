@@ -3,8 +3,6 @@ from __future__ import annotations
 import argparse
 
 from motata_cli.init_profile import PLATFORM_TOKEN_ENV_VARS
-from motata_cli.report.meta import command_meta_report_run
-from motata_cli.report.tiktok import command_tiktok_report_run
 
 
 def add_common_report_arguments(parser: argparse.ArgumentParser, *, platform: str) -> None:
@@ -18,8 +16,18 @@ def add_common_report_arguments(parser: argparse.ArgumentParser, *, platform: st
 
 
 def register_report_commands(subparsers) -> None:
+    from motata_cli.report.meta import command_meta_report_run
+    from motata_cli.report.tiktok import command_tiktok_report_run
+
     report = subparsers.add_parser("report", help="Report data-pull orchestration")
     report_subparsers = report.add_subparsers(dest="report_command", required=True)
+
+    render = report_subparsers.add_parser("render-gmv-max", help="Render an existing GMV Max run as HTML (offline by default)")
+    render.add_argument("--run-dir", required=True)
+    render.add_argument("--out")
+    render.add_argument("--creative-limit", type=int, default=40)
+    render.add_argument("--cache-images", action="store_true", help="Explicitly allow downloading remote preview/avatar images")
+    render.set_defaults(func=command_render_gmv_max)
 
     meta = report_subparsers.add_parser("meta", help="Meta report data pulls")
     meta_subparsers = meta.add_subparsers(dest="report_meta_command", required=True)
@@ -119,3 +127,34 @@ def register_report_commands(subparsers) -> None:
     )
     p.add_argument("--include-product", action="store_true", help="Enable landing product page scraping/enrichment.")
     p.set_defaults(func=command_tiktok_report_run)
+
+
+def command_render_gmv_max(args: argparse.Namespace) -> int:
+    from pathlib import Path
+    from motata_cli.common.display import print_output
+    from motata_cli.common.errors import CliError
+    from motata_cli.common.output import completeness
+    from motata_cli.common.utils import load_json_file
+    from motata_cli.report.gmv_max_html import render
+
+    run_dir = Path(args.run_dir).expanduser().resolve()
+    if not run_dir.is_dir():
+        raise CliError(f"Report run directory not found: {run_dir}")
+    if args.creative_limit < 1:
+        raise CliError("creative-limit must be positive")
+    if not (run_dir / "current_gmv_max_account.json").is_file():
+        raise CliError("GMV Max rendering requires current_gmv_max_account.json from a GMV Max report run")
+    manifest = load_json_file(run_dir / "manifest.json", {})
+    state = completeness(manifest)
+    if not manifest:
+        state = {"schema_version": 1, "status": "partial_success", "complete": False,
+                 "exit_code": 3, "reasons": ["missing_manifest"]}
+    out = Path(args.out).expanduser().resolve() if args.out else run_dir / "report.html"
+    if out.suffix.lower() not in {".html", ".htm"}:
+        raise CliError("HTML output must use .html or .htm; do not overwrite source JSON")
+    html = render(run_dir, creative_limit=args.creative_limit, resolve_items=False, cache_images=args.cache_images)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(html, encoding="utf-8")
+    print_output({"html_path": str(out), "run_dir": str(run_dir), "completeness": state,
+                  "network_enabled": args.cache_images}, as_json=True)
+    return state["exit_code"]

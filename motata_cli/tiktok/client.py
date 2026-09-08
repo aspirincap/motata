@@ -8,7 +8,10 @@ from typing import Any
 
 import requests
 
-from motata_cli.meta.commands import CliError
+from motata_cli.common.errors import CliError
+from motata_cli.common.security import network_error, redact
+
+_SDK_TIMEOUT = (10, 120)
 
 from .sdk import get_business_api_client
 
@@ -65,10 +68,13 @@ class TikTokClient:
         self.identity_api = self.sdk.IdentityApi(self.api_client)
 
     def _invoke(self, fn, *args, **kwargs) -> dict[str, Any]:
+        kwargs["_request_timeout"] = _SDK_TIMEOUT
         try:
             return _to_plain(fn(*args, **kwargs))
-        except Exception as exc:  # pragma: no cover - SDK error classes are dynamic
-            raise CliError(f"TikTok API request failed: {exc}") from exc
+        except Exception as exc:  # SDK exception bodies can contain credentials.
+            # SDK method names are not a reliable read/write classification.
+            # Conservatively warn on unknown outcomes; never retry here.
+            raise CliError(network_error("TikTok API", exc, write=True)) from None
 
     def _list_entities(self, method, advertiser_id: str, **params) -> dict[str, Any]:
         return self._invoke(method, advertiser_id, self.access_token, **_compact_params(params))
@@ -125,20 +131,26 @@ class TikTokClient:
                 params=serialized_params or None,
                 json=json_body,
                 headers={"Access-Token": self.access_token},
-                timeout=timeout,
+                timeout=(10, timeout),
             )
             response.raise_for_status()
             data = response.json()
-        except requests.RequestException as exc:  # pragma: no cover - network/HTTP layer
-            raise CliError(f"TikTok API request failed: {exc}") from exc
-        except ValueError as exc:  # pragma: no cover - invalid JSON
-            raise CliError(f"TikTok API returned invalid JSON: {exc}") from exc
+        except (requests.RequestException, ValueError) as exc:
+            # No implicit retries: a failed write may already have been applied.
+            raise CliError(network_error("TikTok API", exc, write=method.upper() not in {"GET", "HEAD", "OPTIONS"})) from None
 
-        if isinstance(data, dict) and data.get("code") not in (None, 0, "0"):
-            raise CliError(
+        return self._check_response(data)
+
+    def _check_response(self, data: Any) -> dict[str, Any]:
+        if not isinstance(data, dict):
+            raise CliError("TikTok API returned an invalid response object.")
+        if data.get("code") not in (None, 0, "0"):
+            safe = redact(data, (self.access_token,))
+            raise CliError(redact(
                 "TikTok API request failed: "
-                f"Error Code: {data.get('code')}, message: {data.get('message')}, request_id: {data.get('request_id')}"
-            )
+                f"Error Code: {safe.get('code')}, message: {safe.get('message')}, request_id: {safe.get('request_id')}",
+                (self.access_token,),
+            ))
         return data
 
     def create_changelog_task(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -666,21 +678,14 @@ class TikTokClient:
                 self.PAGE_GET_URL,
                 params=params,
                 headers={"Access-Token": self.access_token},
-                timeout=30,
+                timeout=(10, 30),
             )
             response.raise_for_status()
             data = response.json()
-        except requests.RequestException as exc:  # pragma: no cover - network/HTTP layer
-            raise CliError(f"TikTok API request failed: {exc}") from exc
-        except ValueError as exc:  # pragma: no cover - invalid JSON
-            raise CliError(f"TikTok API returned invalid JSON: {exc}") from exc
+        except (requests.RequestException, ValueError) as exc:
+            raise CliError(network_error("TikTok API", exc)) from None
 
-        if isinstance(data, dict) and data.get("code") not in (None, 0, "0"):
-            raise CliError(
-                "TikTok API request failed: "
-                f"Error Code: {data.get('code')}, message: {data.get('message')}, request_id: {data.get('request_id')}"
-            )
-        return data
+        return self._check_response(data)
 
     def list_aigc_voices(
         self,

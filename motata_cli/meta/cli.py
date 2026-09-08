@@ -572,7 +572,8 @@ def register_meta_commands(subparsers) -> None:
     p.add_argument("--url-tags")
     add_payload_arguments(p)
     p.add_argument("--cleanup", action="store_true")
-    p.set_defaults(func=commands.command_validate_creative)
+    p.add_argument("--allow-live-probe", action="store_true", help="Acknowledge this validation creates a real creative; not a dry-run")
+    p.set_defaults(func=commands.command_validate_creative, requires_live_probe=True)
 
     p = validate_sub.add_parser("ad-link")
     add_common_auth_arguments(p)
@@ -580,7 +581,8 @@ def register_meta_commands(subparsers) -> None:
     p.add_argument("--adset-id", required=True)
     p.add_argument("--creative-id", required=True)
     p.add_argument("--cleanup", action="store_true")
-    p.set_defaults(func=commands.command_validate_ad_link)
+    p.add_argument("--allow-live-probe", action="store_true", help="Acknowledge this validation creates a real PAUSED ad; not a dry-run")
+    p.set_defaults(func=commands.command_validate_ad_link, requires_live_probe=True)
 
     p = validate_sub.add_parser("promoted-object")
     add_common_auth_arguments(p)
@@ -590,7 +592,8 @@ def register_meta_commands(subparsers) -> None:
     p.add_argument("--targeting", "--targeting-json", dest="targeting_json", required=True)
     p.add_argument("--promoted-object", "--promoted-object-json", dest="promoted_object_json", required=True)
     p.add_argument("--cleanup", action="store_true")
-    p.set_defaults(func=commands.command_validate_promoted_object)
+    p.add_argument("--allow-live-probe", action="store_true", help="Acknowledge this validation creates real PAUSED campaign/adset objects")
+    p.set_defaults(func=commands.command_validate_promoted_object, requires_live_probe=True)
 
     debug = meta_subparsers.add_parser("debug")
     debug_sub = debug.add_subparsers(dest="debug_command", required=True)
@@ -633,7 +636,7 @@ def register_meta_commands(subparsers) -> None:
     p.add_argument("--promoted-object-overrides", "--promoted-object-overrides-json", dest="promoted_object_overrides_json")
     p.add_argument("--source-access-token")
     p.add_argument("--target-access-token")
-    p.add_argument("--reuse-existing-by-name", action="store_true", default=True)
+    p.add_argument("--reuse-existing-by-name", action="store_true", default=False, help="Deprecated: names alone are not trusted; resume uses the job ledger")
     p.add_argument("--no-reuse-existing-by-name", action="store_false", dest="reuse_existing_by_name")
     p.add_argument("--job-id")
     p.add_argument("--json", action="store_true", default=True)

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from motata_cli.common.output import error_kind, pagination, request_with_retry
+from motata_cli.common.output import completeness, finalize
+from motata_cli.common.security import redact
+
 import argparse
 import json
 import time
@@ -19,7 +23,9 @@ from motata_cli.meta.app_discovery import build_meta_app_report
 from motata_cli.meta.activities import build_meta_activities_report
 from motata_cli.meta.audience import build_meta_audience_breakdown
 from motata_cli.meta.client import MetaClient
-from motata_cli.meta.commands import CliError, normalize_account_id
+from motata_cli.common.errors import CliError
+from motata_cli.common.utils import normalize_account_id, env_first
+from motata_cli.common.auth import resolve_auth
 from motata_cli.meta.landing_pages import build_landing_page_report
 from motata_cli.meta.output import print_output
 from motata_cli.meta.services import get_entity, list_entities
@@ -255,6 +261,8 @@ def _ad_account_path(account_id: str) -> str:
 
 
 def _write_json(path: Path, payload: Any) -> None:
+    if isinstance(payload, dict):
+        finalize(payload)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -535,24 +543,25 @@ class MetaReportRunner:
                 payload = fn()
                 _write_json(path, payload)
                 rows = _payload_row_count(payload)
-                self.record(name, "ok", str(path), attempts=attempt, rows=rows)
+                self.record(name, completeness(payload)["status"], str(path), attempts=attempt, rows=rows, completeness=completeness(payload))
                 return payload
             except Exception as exc:
-                last_error = str(exc)
+                last_error = redact(str(exc), (getattr(self.args, 'access_token', ''),))
+                if error_kind(exc) not in {"network", "rate_limit"}:
+                    break
                 if attempt < attempts:
                     time.sleep(max(0.0, float(self.args.retry_wait or 0.0)))
-        error_payload = {"error": last_error, "source": name, "status": "degraded"}
+        error_payload = {"error": last_error, "source": name, "status": "failed"}
         _write_json(path, error_payload)
-        self.record(name, "degraded", str(path), error=last_error, attempts=attempts)
+        self.record(name, "failed", str(path), error=last_error, attempts=attempt)
         return error_payload
 
     def run(self) -> dict[str, Any]:
-        from motata_cli.meta import commands as meta_commands
-
         if self.args.dry_run:
             return self.dry_run_payload()
 
-        meta = meta_commands.build_meta(self.args)
+        auth = resolve_auth(account_id=self.args.account_id, access_token=self.args.access_token, media_code='facebook')
+        meta = MetaClient(auth.access_token, version=env_first('MOTATA_META_VERSION', default='v23.0'), error_factory=CliError)
         self.run_dir.mkdir(parents=True, exist_ok=True)
 
         self.run_source(
@@ -794,13 +803,14 @@ class MetaReportRunner:
         )
 
 
-def command_meta_report_run(args: argparse.Namespace) -> None:
+def command_meta_report_run(args: argparse.Namespace) -> int:
     args = _prepare_meta_report_args(args)
     account_ids = list(getattr(args, "account_ids", [args.account_id]))
     if len(account_ids) == 1:
         runner = MetaReportRunner(args)
-        print_output(runner.run(), as_json=True)
-        return
+        result = runner.run()
+        print_output(result, as_json=True)
+        return result.get("completeness", {}).get("exit_code", 0)
 
     runs: list[dict[str, Any]] = []
     for account_id in account_ids:
@@ -820,4 +830,5 @@ def command_meta_report_run(args: argparse.Namespace) -> None:
         "run_count": len(runs),
         "runs": runs,
     }
-    print_output(result, as_json=True)
+    print_output(finalize(result), as_json=True)
+    return result["completeness"]["exit_code"]

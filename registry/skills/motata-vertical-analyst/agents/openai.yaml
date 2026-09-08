@@ -1,0 +1,4 @@
+interface:
+  display_name: "motata-vertical-analyst"
+  short_description: "Vertical-aware Meta/TikTok analysis with HTML reporting and dataset support"
+  default_prompt: "Use $motata-vertical-analyst for post-campaign review, daily/weekly reporting, audience optimization, advertiser type classification, Meta/TikTok metric presets, active metric verification, vertical-specific performance diagnosis, and HTML reports. Confirm account IDs first; if classification is missing but account IDs are present, run Motata user-type analysis silently and report the source. For exported Motata data, external business datasets, or formal reports, route through $motata-report and return the HTML report as the primary artifact."

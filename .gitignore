@@ -27,17 +27,35 @@ dist/
 *.whl
 *.zip
 
-cloudflare/
+cloudflare/*
+!cloudflare/motata-skills-registry/
+cloudflare/motata-skills-registry/*
+!cloudflare/motata-skills-registry/package.json
+!cloudflare/motata-skills-registry/package-lock.json
+!cloudflare/motata-skills-registry/wrangler.toml
 meta_ad_previews/
-motata-ad-ops/
-motata-starter/
-motata-token/
-skills/
+/motata-ad-ops/
+/motata-starter/
+/motata-token/
+/skills/
 
 scripts/*
 !scripts/npm-postinstall.js
+!scripts/generate_gmv_max_html_report.py
+!scripts/generate_motata_html_report.py
+!scripts/build_skill_registry.py
+!scripts/check_release.py
+!scripts/run_offline_tests.py
 
 /*.md
 !/README.md
 /tmp_*
 /skills-lock.json
+/.runtime/
+/outputs/
+/.codex_tmp/
+/.firecrawl/
+
+# Only the canonical registry source is versioned, not local agent installs.
+registry/*
+!registry/skills/

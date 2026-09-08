@@ -8,16 +8,11 @@ from typing import Any
 
 from motata_cli.auth_center.fetch_token import fetch_access_token
 from motata_cli.meta.client import MetaClient
-from motata_cli.meta.commands import (
-    CACHE_DIR,
-    CliError,
-    META_VERSION,
-    ad_account_path,
-    load_config,
-    normalize_account_id,
-    save_config,
-)
-from motata_cli.meta.output import print_output
+from motata_cli.common.config import CACHE_DIR, load_config, save_config
+from motata_cli.common.errors import CliError
+from motata_cli.common.utils import normalize_account_id, env_first
+from motata_cli.meta.utils import ad_account_path
+from motata_cli.common.display import print_output
 from motata_cli.meta.user_type import build_user_type_report
 from motata_cli.metrics.presets import recommend_metric_presets
 from motata_cli.tiktok.app_discovery import discover_operable_advertiser_ids
@@ -25,6 +20,7 @@ from motata_cli.tiktok.client import TikTokClient
 from motata_cli.tiktok.user_type import build_tiktok_user_type_report
 
 
+META_VERSION = env_first("MOTATA_META_VERSION", default="v23.0")
 AUTH_CENTER_ENV_VARS = ("AUTH_CENTER_API_KEY",)
 
 MESSAGES = {

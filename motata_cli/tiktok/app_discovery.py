@@ -4,7 +4,7 @@ from collections import defaultdict
 from datetime import date, timedelta
 from typing import Any
 
-from motata_cli.meta.commands import CliError
+from motata_cli.common.errors import CliError
 
 from .landing_pages import _chunked, _dimension, _extract_collection, _fnum, _inum, _metric, _page_info
 

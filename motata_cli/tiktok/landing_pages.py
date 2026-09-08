@@ -7,7 +7,9 @@ from datetime import date, timedelta
 from typing import Any, Callable
 from urllib.parse import parse_qsl, unquote, urlencode, urlparse, urlunparse
 
-from motata_cli.meta.commands import CliError
+from motata_cli.common.errors import CliError
+from motata_cli.common.output import error_kind, request_with_retry, pagination
+from motata_cli.common.output import finalize, unsupported_metrics
 
 
 LANDING_URL_RE = re.compile(r"https?://[^\s\"'<>\\]+")
@@ -121,6 +123,11 @@ DEFAULT_ADGROUP_FIELDS = [
     "operation_status",
     "placements",
 ]
+
+
+def _currency(value: Any) -> str | None:
+    text = str(value or '').strip().upper()
+    return text if re.fullmatch(r'[A-Z]{3}', text) else None
 
 
 def _fnum(value: Any) -> float:
@@ -507,6 +514,8 @@ def _report_rows(
     max_rows: int | None = None,
     metrics: list[str] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    if max_pages < 1 or page_size < 1:
+        raise CliError('max_pages and page_size must be positive')
     requested_metrics = metrics or DEFAULT_REPORT_METRICS
     attempts: list[dict[str, Any]] = []
     for candidate_metrics in _report_metric_candidates(requested_metrics):
@@ -514,7 +523,7 @@ def _report_rows(
         mode = _report_metrics_mode(candidate_metrics, requested_metrics)
         try:
             for page in range(1, max_pages + 1):
-                response = client.integrated_report(
+                response = request_with_retry(client.integrated_report,
                     "BASIC",
                     advertiser_id=advertiser_id,
                     data_level="AUCTION_AD",
@@ -529,25 +538,29 @@ def _report_rows(
                 )
                 page_rows = _extract_collection(response, "list")
                 rows.extend(page_rows)
+                info = _page_info(response)
+                total_page = int(_fnum(info.get('total_page') or info.get('total_pages')))
+                page_status = pagination(page, page_size, len(page_rows), total_page)
                 if max_rows is not None and max_rows > 0 and len(rows) >= max_rows:
+                    page_status = pagination(page, page_size, len(page_rows), total_page, row_limit=len(rows) > max_rows or page_status['truncated'])
                     rows = rows[:max_rows]
                     break
-                info = _page_info(response)
-                total_page = int(_fnum(info.get("total_page") or info.get("total_pages")))
                 if total_page and page >= total_page:
                     break
                 if len(page_rows) < page_size:
                     break
-            warning = None
+            metadata = {
+                **page_status,
+                "advertiser_id": advertiser_id,
+                "report_attribute_mode": mode,
+                "attempts": attempts,
+            }
             if attempts:
-                warning = {
-                    "advertiser_id": advertiser_id,
-                    "fallback": f"retried TikTok report with {mode}",
-                    "report_attribute_mode": mode,
-                    "attempts": attempts,
-                }
-            return rows, warning
+                metadata['fallback'] = f"retried TikTok report with {mode}"
+            return rows, metadata
         except CliError as exc:
+            if not unsupported_metrics(exc):
+                raise
             attempts.append(
                 {
                     "mode": mode,
@@ -1065,6 +1078,7 @@ def _unresolved_ad_structure(report_row: dict[str, Any], resolved: dict[str, Any
     campaign_spc = resolved.get("campaign_spc") or {}
     return {
         "advertiser_id": report_row.get("advertiser_id"),
+        "currency": report_row.get("currency"),
         "ad_id": report_row.get("ad_id"),
         "ad_name": ad_detail.get("ad_name") or report_row.get("ad_name"),
         "campaign_id": ad_detail.get("campaign_id") or report_row.get("campaign_id"),
@@ -1194,11 +1208,20 @@ def build_tiktok_landing_page_report(
     ad_detail_cache: dict[str, dict[str, Any]] | None = None,
     preloaded_report_rows: list[dict[str, Any]] | dict[str, list[dict[str, Any]]] | None = None,
     preloaded_asset_report_rows: list[dict[str, Any]] | dict[str, list[dict[str, Any]]] | None = None,
+    preloaded_report_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    groups: dict[str, dict[str, Any]] = {}
+    groups: dict[tuple[str, str], dict[str, Any]] = {}
+    if len(set(advertiser_ids)) > 1 and (isinstance(preloaded_report_rows, list) or isinstance(preloaded_asset_report_rows, list)):
+        raise CliError('Multi-account preloaded rows must be keyed by advertiser_id')
+    if len(set(advertiser_ids)) > 1:
+        ad_detail_cache = None
     no_url: list[dict[str, Any]] = []
     account_errors: list[dict[str, Any]] = []
     account_warnings: list[dict[str, Any]] = []
+    if preloaded_report_metadata:
+        for source, metadata in preloaded_report_metadata.items():
+            if metadata.get('truncated') or metadata.get('warnings') or metadata.get('error'):
+                account_warnings.append({'source': source, **metadata})
     adgroup_cache: dict[str, dict[str, Any]] = {}
     campaign_spc_cache: dict[str, dict[str, Any]] = {}
     total_spend_ads: list[dict[str, Any]] = []
@@ -1212,9 +1235,20 @@ def build_tiktok_landing_page_report(
     creative_url_ad_count = 0
     app_store_url_ad_count = 0
     report_attribute_modes: dict[str, str] = {}
+    account_pagination: dict[str, Any] = {}
     skip_campaign_id_set = {str(value).strip() for value in (skip_campaign_ids or []) if str(value).strip()}
 
-    for advertiser_id in advertiser_ids:
+    for advertiser_id in dict.fromkeys(advertiser_ids):
+        adgroup_cache = {}
+        account_currency = None
+        if hasattr(client, 'get_account_info'):
+            try:
+                metadata = client.get_account_info([advertiser_id], fields=['advertiser_id', 'currency'])
+                for account in _extract_collection(metadata, 'list'):
+                    if str(account.get('advertiser_id')) == str(advertiser_id):
+                        account_currency = account.get('currency')
+            except Exception as exc:
+                account_warnings.append({'advertiser_id': advertiser_id, 'error': str(exc), 'source': 'account_currency'})
         try:
             asset_report_rows: list[dict[str, Any]] = []
             if isinstance(preloaded_asset_report_rows, dict):
@@ -1242,12 +1276,16 @@ def build_tiktok_landing_page_report(
                     max_rows=ad_limit,
                 )
             if (use_asset_rows or preloaded_report_rows is not None) and ad_limit is not None and ad_limit > 0:
+                if len(report_rows) > ad_limit:
+                    account_warnings.append({'advertiser_id': advertiser_id, 'truncated': True, 'stop_reason': 'max_rows'})
                 report_rows = report_rows[:ad_limit]
         except Exception as exc:
             account_errors.append({"advertiser_id": advertiser_id, "error": str(exc)})
             continue
         if warning:
-            account_warnings.append(warning)
+            account_pagination[advertiser_id] = warning
+            if warning.get('truncated') or warning.get('attempts'):
+                account_warnings.append(warning)
             report_attribute_modes[advertiser_id] = str(warning.get("report_attribute_mode") or "fallback")
         elif use_asset_rows:
             report_attribute_modes[advertiser_id] = "preloaded_ad_id_v2_insights"
@@ -1270,6 +1308,7 @@ def build_tiktok_landing_page_report(
             spend_rows.append(
                 {
                     "advertiser_id": advertiser_id,
+                    "currency": _currency(_metric(row, 'currency')) or _currency(account_currency),
                     "ad_id": ad_id,
                     "spend": spend,
                     "impressions": _inum(_metric(row, "impressions")),
@@ -1422,9 +1461,13 @@ def build_tiktok_landing_page_report(
                 no_url.append(_unresolved_ad_structure(row, resolved, spend))
                 continue
 
+            currency = row.get('currency')
+            currency = str(currency).strip().upper() if currency and str(currency).strip() != '-' else None
+            row['currency'] = currency
             group = groups.setdefault(
-                landing_url,
+                (currency or f'unknown:{advertiser_id}', landing_url),
                 {
+                    "currency": currency,
                     "url": landing_url,
                     "url_source": resolved.get("url_source"),
                     "advertisers": set(),
@@ -1462,6 +1505,7 @@ def build_tiktok_landing_page_report(
             group["ads"].append(
                 {
                     "advertiser_id": advertiser_id,
+                    "currency": currency,
                     "ad_id": row["ad_id"],
                     "ad_name": ad_detail.get("ad_name"),
                     "campaign_id": ad_detail.get("campaign_id"),
@@ -1494,6 +1538,7 @@ def build_tiktok_landing_page_report(
         complete_payment = group["complete_payment"]
         revenue = group["revenue"]
         item = {
+            "currency": group['currency'],
             "url": group["url"],
             "url_source": group["url_source"],
             "advertisers": sorted(group["advertisers"]),
@@ -1520,16 +1565,38 @@ def build_tiktok_landing_page_report(
             item["ads"] = sorted(group["ads"], key=lambda ad: ad["spend"], reverse=True)
         rows.append(item)
 
-    rows.sort(key=lambda item: item["spend"], reverse=True)
+    # There is no meaningful global spend rank across currencies. Unknown
+    # currencies are separate account scopes, even if nominal values match.
+    def monetary_scope(item: dict[str, Any]) -> str:
+        return item.get('currency') or f"unknown:{','.join(item.get('advertisers') or [item.get('advertiser_id', '')])}"
+
+    rows.sort(key=lambda item: (monetary_scope(item), -item['spend']))
+    available_group_count = len(rows)
     if top is not None and top > 0:
-        rows = rows[:top]
+        selected = []
+        counts: dict[str, int] = {}
+        for item in rows:
+            scope = monetary_scope(item)
+            counts[scope] = counts.get(scope, 0) + 1
+            if counts[scope] <= top:
+                selected.append(item)
+        rows = selected
 
     _enrich_product_rows(rows, enrich_product=enrich_product, product_limit=product_limit, product_scraper=product_scraper)
 
     total_revenue = sum(row["revenue"] for row in rows)
     total_spend = sum(row["spend"] for row in rows)
-    no_url.sort(key=lambda item: item["spend"], reverse=True)
-    return {
+    no_url.sort(key=lambda item: (monetary_scope(item), -item['spend']))
+    currency_scopes = {(r.get('currency') or f"unknown:{r['advertiser_id']}") for r in total_spend_ads}
+    comparable = len(currency_scopes) <= 1
+    result = {
+        "monetary_totals_comparable": comparable,
+        "ranking_scope": "currency_or_unknown_account",
+        "top_per_currency_scope": top,
+        "available_group_count": available_group_count,
+        "totals_scope": "selected_landing_rows",
+        "currencies": sorted({r['currency'] for r in total_spend_ads if r.get('currency')}),
+        "truncated": any(w.get('truncated') for w in account_warnings),
         "start_date": start_date,
         "end_date": end_date,
         "advertiser_ids": advertiser_ids,
@@ -1540,6 +1607,8 @@ def build_tiktok_landing_page_report(
         "account_errors": account_errors,
         "account_warnings": account_warnings,
         "report_attribute_modes": report_attribute_modes,
+        "source_metadata": preloaded_report_metadata or {},
+        "account_pagination": account_pagination,
         "adgroup_probe_count": len(adgroup_cache),
         "campaign_spc_probe_count": len(campaign_spc_cache),
         "skipped_url_probe_count": skipped_url_probe_count,
@@ -1560,3 +1629,9 @@ def build_tiktok_landing_page_report(
         "rows": rows,
         "no_url": no_url[:50],
     }
+    if not comparable:
+        for key in ('ad_spend_total', 'total_spend', 'total_revenue', 'overall_roas', 'no_url_spend'):
+            result[key] = None
+    if account_errors and len(account_errors) == len(set(advertiser_ids)):
+        result['status'] = 'failed'
+    return finalize(result)

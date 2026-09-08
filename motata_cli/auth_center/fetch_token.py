@@ -8,6 +8,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from motata_cli.common.security import network_error, redact
+
 
 def build_headers(api_key: str, header_mode: str) -> dict[str, str]:
     headers = {"Accept": "application/json"}
@@ -71,9 +73,18 @@ def extract_access_token(payload: dict, mode: str) -> str | None:
     return token.get("access_token")
 
 
+def _inventory_accounts(payload: dict) -> list[dict]:
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        raise RuntimeError("Auth Center returned invalid inventory data.")
+    accounts = data.get("accounts")
+    if not isinstance(accounts, list) or any(not isinstance(item, dict) for item in accounts):
+        raise RuntimeError("Auth Center returned invalid inventory accounts.")
+    return accounts
+
+
 def extract_inventory_account(payload: dict, account_id: str) -> dict | None:
-    data = payload.get("data") or {}
-    accounts = data.get("accounts") or []
+    accounts = _inventory_accounts(payload)
     for account in accounts:
         if str(account.get("account_id") or "") == str(account_id):
             return account
@@ -107,9 +118,43 @@ def request_payload(
 ) -> dict:
     url = base_url.rstrip("/") + path + query
     request = urllib.request.Request(url=url, headers=build_headers(api_key, header_mode), method="GET")
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        raw = response.read().decode("utf-8")
-    return json.loads(raw)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            raw = response.read().decode("utf-8")
+        payload = json.loads(raw)
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(network_error("Auth Center", exc)) from None
+    if not isinstance(payload, dict) or payload.get("success") is False:
+        raise RuntimeError("Auth Center returned an unsuccessful or invalid response.")
+    return payload
+
+
+def find_inventory_account(args: argparse.Namespace, payload: dict) -> dict | None:
+    """Follow numeric pages; the local contract guarantees accounts, not metadata.
+
+    Do not assume a short page is the last page (servers may cap page_size).
+    Detect ignored pagination and cap requests rather than looping indefinitely.
+    """
+    seen: set[tuple[str, ...]] = set()
+    page_args = argparse.Namespace(**vars(args))
+    page_args.page = getattr(args, "page", None) or 1
+    for _ in range(1000):
+        account = extract_inventory_account(payload, args.account_id)
+        if account is not None:
+            return account
+        accounts = _inventory_accounts(payload)
+        if not accounts:
+            return None
+        signature = tuple(sorted(str(item.get("account_id")) for item in accounts))
+        if signature in seen:
+            raise RuntimeError("Inventory pagination repeated a page; account lookup is incomplete.")
+        seen.add(signature)
+        page_args.page += 1
+        payload = request_payload(
+            base_url=args.base_url, path=build_path(args), api_key=args.api_key,
+            header_mode=args.header, query=build_query(page_args),
+        )
+    raise RuntimeError("Inventory page limit reached; account lookup is incomplete.")
 
 
 def fetch_access_token(
@@ -186,31 +231,30 @@ def main(argv: list[str] | None = None) -> int:
             header_mode=args.header,
             query=build_query(args),
         )
-    except urllib.error.HTTPError as exc:
-        error_text = exc.read().decode("utf-8", errors="replace")
-        print(f"HTTP {exc.code}", file=sys.stderr)
-        print(error_text, file=sys.stderr)
-        return 1
-    except urllib.error.URLError as exc:
-        print(f"Request failed: {exc}", file=sys.stderr)
+    except (OSError, ValueError, RuntimeError) as exc:
+        print(network_error("Auth Center", exc), file=sys.stderr)
         return 1
 
     if args.mode == "inventory":
         if args.account_id:
-            account = extract_inventory_account(payload, args.account_id)
+            try:
+                account = find_inventory_account(args, payload)
+            except (OSError, ValueError, RuntimeError) as exc:
+                print(network_error("Auth Center inventory lookup", exc), file=sys.stderr)
+                return 1
             if account is None:
-                print(f"No account found for account_id={args.account_id}.", file=sys.stderr)
-                print(json.dumps(payload, indent=2, ensure_ascii=False), file=sys.stderr)
+                print(redact(f"No account found for account_id={args.account_id}.", (args.api_key,)), file=sys.stderr)
                 return 1
             if args.json:
                 print(json.dumps(account, indent=2, ensure_ascii=False))
                 return 0
-            token = (account.get("token") or {}).get("access_token")
+            token_data = account.get("token")
+            token = token_data.get("access_token") if isinstance(token_data, dict) else None
             if token:
                 print(token)
                 return 0
-            print(json.dumps(account, indent=2, ensure_ascii=False))
-            return 0
+            print("No access token found for the selected inventory account.", file=sys.stderr)
+            return 1
         if args.compact:
             print(format_inventory_compact(payload))
             return 0
@@ -230,7 +274,6 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     print("No access token found in response payload.", file=sys.stderr)
-    print(json.dumps(payload, indent=2, ensure_ascii=False), file=sys.stderr)
     return 1
 
 

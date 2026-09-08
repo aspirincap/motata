@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from motata_cli.meta.commands import load_config, normalize_account_id
+from motata_cli.common.config import load_config
+from motata_cli.common.utils import normalize_account_id
 
 
 PLATFORM_TOKEN_ENV_VARS = {

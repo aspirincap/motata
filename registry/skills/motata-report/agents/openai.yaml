@@ -1,0 +1,4 @@
+interface:
+  display_name: "Motata Report"
+  short_description: "Motata HTML reports with validation and audit"
+  default_prompt: "Use $motata-report to generate a Motata HTML performance report with dataset validation and post-generation audit."

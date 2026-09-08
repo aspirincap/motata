@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from motata_cli.meta.utils import ad_account_path
 import argparse
 from typing import TYPE_CHECKING, Any
 
@@ -9,12 +10,6 @@ if TYPE_CHECKING:
     from motata_cli.meta.client import MetaClient
 
 
-def _commands_module() -> Any:
-    from motata_cli.meta import commands as meta_commands
-
-    return meta_commands
-
-
 def create_creative(meta: MetaClient, account_id: str, args: argparse.Namespace) -> dict[str, Any]:
     payload = build_creative_payload(args)
-    return meta.post(f"{_commands_module().ad_account_path(account_id)}/adcreatives", data=payload)
+    return meta.post(f"{ad_account_path(account_id)}/adcreatives", data=payload)

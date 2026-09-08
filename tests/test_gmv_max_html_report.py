@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-import importlib.util
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 
-MODULE_PATH = Path(__file__).resolve().parents[1] / "scripts" / "generate_gmv_max_html_report.py"
-SPEC = importlib.util.spec_from_file_location("generate_gmv_max_html_report", MODULE_PATH)
-gmv_report = importlib.util.module_from_spec(SPEC)
-assert SPEC and SPEC.loader
-SPEC.loader.exec_module(gmv_report)
+from motata_cli.report import gmv_max_html as gmv_report
 
 
 class GmvMaxCreativeJudgementTests(unittest.TestCase):
@@ -223,7 +219,10 @@ class GmvMaxCreativeJudgementTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            html = gmv_report.render(run_dir)
+            # Rendering assertions use fixture URLs; unit tests must not fetch
+            # avatar images from the public internet.
+            with patch.object(gmv_report, "cache_remote_images", return_value={}):
+                html = gmv_report.render(run_dir)
 
             self.assertIn("Top 40 / 42", html)
             self.assertIn("产品 / Item Group", html)

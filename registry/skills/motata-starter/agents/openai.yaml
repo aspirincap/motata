@@ -1,0 +1,4 @@
+interface:
+  display_name: "Motata Starter"
+  short_description: "Research, route, execute, and review Meta/TikTok ads workflows"
+  default_prompt: "Use Motata Starter to route Meta/TikTok work by scenario. Start with motata init when token source, account scope, or baseline metrics are unclear. Route new-account takeover, asset inventory, prelaunch validation, bottleneck checks, and migration into Motata Ad Ops; route product-URL cold starts into product intake; route ecommerce page diagnosis, creative fatigue, and anomaly detection into Motata Vertical Analyst; route daily/weekly review outputs into Motata Report; route multi-account standardization into inventory plus batch report flows. Prefer Auth Center token retrieval when API keys are available, keep writes safe by default, and return the chosen path, expected outputs, and next actions."

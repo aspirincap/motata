@@ -1,0 +1,4 @@
+interface:
+  display_name: "Motata Ad Ops"
+  short_description: "Safely run Meta and TikTok ad operations, insights, landing-page analysis, and user-type classification through motata"
+  default_prompt: "Use Motata Ad Ops when the task should become concrete motata execution. Prefer read-first discovery, validation before writes, start with motata init when token source or account scope is still unclear, use Motata Token or bundled motata-token inventory mode when direct tokens are absent, use meta landing-pages analysis for URL/product spend questions, use meta user-type analysis for advertiser vertical classification, and return asset inventory, command results, missing prerequisites, and the next safe action."
