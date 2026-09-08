@@ -4,6 +4,7 @@ import io
 import json
 import unittest
 from contextlib import redirect_stdout
+from pathlib import Path
 from unittest.mock import patch
 
 from motata_cli.__main__ import build_parser
@@ -112,7 +113,7 @@ class ReportInitDefaultsTests(unittest.TestCase):
         self.assertEqual(payload["run_count"], 2)
         self.assertEqual(payload["runs"][0]["account_id"], "111")
         self.assertEqual(payload["runs"][1]["account_id"], "222")
-        self.assertTrue(payload["runs"][0]["run_dir"].endswith("build/meta-batch/account_111"))
+        self.assertEqual(Path(payload["runs"][0]["run_dir"]).parts[-3:], ("build", "meta-batch", "account_111"))
 
     def test_tiktok_report_accepts_comma_separated_accounts(self) -> None:
         parser = build_parser()
@@ -148,7 +149,7 @@ class ReportInitDefaultsTests(unittest.TestCase):
         self.assertEqual(payload["run_count"], 2)
         self.assertEqual(payload["runs"][0]["advertiser_id"], "aaa")
         self.assertEqual(payload["runs"][1]["advertiser_id"], "bbb")
-        self.assertTrue(payload["runs"][1]["run_dir"].endswith("build/tiktok-batch/advertiser_bbb"))
+        self.assertEqual(Path(payload["runs"][1]["run_dir"]).parts[-3:], ("build", "tiktok-batch", "advertiser_bbb"))
 
 
 if __name__ == "__main__":
