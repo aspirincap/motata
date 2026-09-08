@@ -1,15 +1,15 @@
 # Motata 更新交接｜四阶段加固
 
-更新时间：2026-09-08（0.2.0 候选准备）
+更新时间：2026-09-08（0.2.0 npm 发布）
 项目目录：`/Users/mvgz0331/Desktop/motata`
 基线提交：`b2d7dc1` — Release motata v0.1.9（2026-08-21）
 
 ## 1. 接手先看
 
-- 四阶段实施、审查、源码提交与实际 Linux/Windows CI 已完成，随后准备了用户确认的 **0.2.0**。工作分支：`codex/hardening-release-0.2.0`；尚未合并 main。
-- `package.json`、`pyproject.toml`、`motata_cli/__init__.py` 为 **0.2.0 候选**，skills bundle 为 `motata-skills-2026-09-08`。未创建发布标签、未发布 npm/PyPI。
+- 四阶段实施、审查、源码提交与实际 Linux/Windows CI 已完成；用户确认的 **0.2.0 已发布 npm**，`latest` 为 `0.2.0`。发布源码提交 `1593e63372c22b31387fcf539d9397ee7288e182` 已快进合并至 main，标签为 `v0.2.0`。
+- `package.json`、`pyproject.toml`、`motata_cli/__init__.py` 为 **0.2.0**，skills bundle 为 `motata-skills-2026-09-08`。PyPI 与 Cloudflare registry 尚未发布。
 - 最终 556 个候选源码文件已完成独立复制与检查；common、services、CI、registry 和新增测试与原有修改一起纳入提交。
-- 本轮未操作真实广告账户、未执行 Cloudflare 部署、未修改全局安装。安装验证仅在临时目录完成。
+- 用户另行授权后已完成真实 Meta/TikTok 只读抽样验证：33 次 GET、0 次写入，32 项读取成功、1 项像素权限失败。脱敏详情仅保留于本机忽略目录 `outputs/live-readonly-20260908-163651/`；未执行 Cloudflare 部署或修改全局安装。
 - **不要使用 `git reset --hard`、`git clean` 或覆盖式拉取来“清理”工作树。**本机旧产物、运行目录与历史文件也不属于本轮可删除范围。
 - 本文是最新交接入口。根目录 `RECENT_REFACTOR_HANDOFF.md` 中的 2026-05 历史发布与真实账户记录不代表本轮状态，尤其“当前不是 Git 仓库”和旧版本发布建议已过时。
 
@@ -79,11 +79,12 @@
 | wheel/sdist/npm 清单、资源、版本、秘密扫描 | 通过 |
 | 从 sdist 重建 wheel | 通过 |
 | 使用本地 wheelhouse 的临时 wheel/npm 安装、CLI help、npm 渠道识别 | 通过 |
+| 发布后从公共 npm 下载并隔离安装 0.2.0、runtime 标记、版本与 Meta/TikTok CLI help | 通过 |
 | `git diff --check` | 通过 |
 
-公共依赖下载到临时目录后，安装 smoke 使用 `PIP_NO_INDEX`。广告 API 均为 mock。**本次已在独立候选源码目录重跑全套测试、registry 构建及完整 wheel/npm 安装验证。**新增审查修复详见 `hardening-validation.md`。
+公共依赖下载到临时目录后，安装 smoke 使用 `PIP_NO_INDEX`。自动化门禁中的广告 API 均为 mock；后续真实账户抽样仅使用 GET，未运行真实写入探针。**本次已在独立候选源码目录重跑全套测试、registry 构建及完整 wheel/npm 安装验证。**新增审查修复详见 `hardening-validation.md`。
 
-实际远端基线 `607710c` 的 [GitHub Actions](https://github.com/aspirincap/motata/actions/runs/34204671149) 已通过：Ubuntu Python 3.11/3.13 各 339 Python + 11 Node；Windows Python 3.11 为 339 Python + 10 Node 通过，1 项 POSIX Node fixture 跳过。0.2.0 候选提交使用同一门禁，最终状态见 [分支 CI](https://github.com/aspirincap/motata/actions/workflows/release-check.yml?query=branch%3Acodex%2Fhardening-release-0.2.0)。
+发布源码 `1593e63` 的 [GitHub Actions](https://github.com/aspirincap/motata/actions/runs/34204990637) 已通过：Ubuntu Python 3.11/3.13 各 339 Python + 11 Node；Windows Python 3.11 为 339 Python + 10 Node 通过，1 项 POSIX Node fixture 跳过。npm 发布使用该提交的原始审核包，440 个分发文件逐一匹配受控源码。
 
 ## 5. 接手复现命令
 
@@ -112,12 +113,12 @@ wheelhouse 按 `requirements-release.txt` 准备；依赖预备需要网络，�
 1. **已完成审查并收齐源码**：保留 common、services、renderer、registry、CI、scripts 与 tests，排除凭据和本机运行产物。
 2. **已完成本地门禁**：339 项 Python、11 项 Node、registry 构建与完整 wheel/npm 安装验证通过。
 3. **已提交并运行实际 CI**：完整源码与跨平台修复已 push 到工作分支，Linux Python 3.11/3.13 与 Windows Python 3.11 验证通过。
-4. **已准备 0.2.0**：版本、skills compatibility 与 [release notes/升级说明](releases/0.2.0.md) 已同步；候选版本继续通过同一门禁验证。审计产物位于 `dist/0.2.0/`，以 manifest 中的 Git SHA 为源码依据。
-5. **另行确认真实账户验收与发布**：先只读验证权限/字段；任何 live probe、创建、更新、删除、npm/PyPI 发布或 Cloudflare 部署须单独确认。不要把“用户要求代码实施”解释为持续远端操作授权。
+4. **已发布 npm 0.2.0**：[npm 包](https://www.npmjs.com/package/motata/v/0.2.0) 的 `latest` 已指向 `0.2.0`；发布包与 `dist/0.2.0/` 审核包一致。发布源码由 manifest 和 `v0.2.0` 标识，升级说明见 [release notes](releases/0.2.0.md)。构建 manifest 中的发布前状态是历史审计快照。
+5. **真实账户只读抽样已完成**：账户、对象与非空历史指标可读取并通过一致性核对；像素权限和身份分页边界见下节。任何后续 live probe、创建、更新、删除、PyPI 发布或 Cloudflare 部署仍须获得对应授权。
 
 ## 7. 已知边界与后续事项
 
-- 本轮没有验证真实平台账户权限、当前 API 支持字段或在线投放效果。
+- 真实账户验证覆盖抽样读取，不代表全部资产或写入权限通过：一个 Meta 引用像素返回 `Missing perms`；TikTok 身份列表返回条数与全零分页元数据不一致。未验证写入、迁移执行或在线投放效果，未公开账户响应和凭据。
 - 不确定迁移写入需要人工核验请求回执、目标归属与 payload；没有自动 adoption/reset/delete 来绕过保护。
 - TikTok copy/bootstrap 有部分成功清单，但并未具备 Meta migration 那套恢复 ledger。
 - TikTok commands 仍可继续按业务域收敛，但应先保住现有兼容性测试，不再做无边界大搬迁。
