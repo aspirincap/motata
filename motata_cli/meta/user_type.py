@@ -164,7 +164,8 @@ def _match_keywords(text: str) -> dict[str, float]:
             if any("\u4e00" <= char <= "\u9fff" for char in needle):
                 matched = needle in haystack
             else:
-                matched = re.search(rf"(?<![a-z0-9]){re.escape(needle).replace(r'\\ ', r'\\s+')}(?![a-z0-9])", haystack) is not None
+                escaped_needle = re.escape(needle).replace(r"\\ ", r"\\s+")
+                matched = re.search(rf"(?<![a-z0-9]){escaped_needle}(?![a-z0-9])", haystack) is not None
             if matched:
                 scores[label] += weight
     return scores

@@ -6,6 +6,7 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python: ['3.11', '3.13']
     steps:
@@ -26,10 +27,12 @@ jobs:
           PIP_NO_INDEX: '1'
           MOTATA_SUPPRESS_SKILLS_NOTICE: '1'
         run: |
-          sudo unshare --net --map-root-user --user env MOTATA_SUPPRESS_SKILLS_NOTICE=1 "$pythonLocation/bin/python" scripts/run_offline_tests.py
-          sudo unshare --net --map-root-user --user env PYTHONDONTWRITEBYTECODE=1 "$pythonLocation/bin/python" scripts/build_skill_registry.py
-          sudo unshare --net --map-root-user --user env PATH="$PATH" node --test tests/runtime.test.js tests/runtime-lock.test.js
-          sudo unshare --net --map-root-user --user env PATH="$PATH" PIP_NO_INDEX=1 "$pythonLocation/bin/python" scripts/check_release.py --wheelhouse /tmp/motata-wheelhouse
+          # Keep the host UID mapping: remapping only root makes runner-owned
+          # checkout directories inaccessible inside a separate user namespace.
+          sudo unshare --net env PATH="$PATH" MOTATA_SUPPRESS_SKILLS_NOTICE=1 "$pythonLocation/bin/python" scripts/run_offline_tests.py
+          sudo unshare --net env PYTHONDONTWRITEBYTECODE=1 "$pythonLocation/bin/python" scripts/build_skill_registry.py
+          sudo unshare --net env PATH="$PATH" node --test tests/runtime.test.js tests/runtime-lock.test.js
+          sudo unshare --net env PATH="$PATH" PIP_NO_INDEX=1 "$pythonLocation/bin/python" scripts/check_release.py --wheelhouse /tmp/motata-wheelhouse
   windows:
     runs-on: windows-latest
     steps:
