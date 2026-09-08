@@ -1,14 +1,14 @@
 # Motata 更新交接｜四阶段加固
 
-更新时间：2026-09-08（提交前审查与重验）
+更新时间：2026-09-08（0.2.0 候选准备）
 项目目录：`/Users/mvgz0331/Desktop/motata`
 基线提交：`b2d7dc1` — Release motata v0.1.9（2026-08-21）
 
 ## 1. 接手先看
 
-- 四阶段本地实施与提交前审查已完成，用户已授权收齐源码、提交并运行实际 Linux/Windows CI，随后准备 **0.2.0**。工作分支：`codex/hardening-release-0.2.0`。
-- `package.json`、`pyproject.toml`、`motata_cli/__init__.py` 仍为 **0.1.9**；这不表示本轮加固已发布到 npm/PyPI。
-- 555 个候选源码文件已完成独立复制与检查；common、services、CI、registry 和新增测试与原有修改一起纳入提交。
+- 四阶段实施、审查、源码提交与实际 Linux/Windows CI 已完成，随后准备了用户确认的 **0.2.0**。工作分支：`codex/hardening-release-0.2.0`；尚未合并 main。
+- `package.json`、`pyproject.toml`、`motata_cli/__init__.py` 为 **0.2.0 候选**，skills bundle 为 `motata-skills-2026-09-08`。未创建发布标签、未发布 npm/PyPI。
+- 最终 556 个候选源码文件已完成独立复制与检查；common、services、CI、registry 和新增测试与原有修改一起纳入提交。
 - 本轮未操作真实广告账户、未执行 Cloudflare 部署、未修改全局安装。安装验证仅在临时目录完成。
 - **不要使用 `git reset --hard`、`git clean` 或覆盖式拉取来“清理”工作树。**本机旧产物、运行目录与历史文件也不属于本轮可删除范围。
 - 本文是最新交接入口。根目录 `RECENT_REFACTOR_HANDOFF.md` 中的 2026-05 历史发布与真实账户记录不代表本轮状态，尤其“当前不是 Git 仓库”和旧版本发布建议已过时。
@@ -68,7 +68,7 @@
 
 ## 4. 已完成的验收
 
-上轮最终验收环境：macOS、Python 3.14.2；在独立候选源码目录中执行。
+本轮验收环境：macOS、Python 3.14.2 与真实 Python 3.11.9；独立候选源码测试与完整打包安装验证已执行。
 
 | 项目 | 结果 |
 |---|---|
@@ -82,6 +82,8 @@
 | `git diff --check` | 通过 |
 
 公共依赖下载到临时目录后，安装 smoke 使用 `PIP_NO_INDEX`。广告 API 均为 mock。**本次已在独立候选源码目录重跑全套测试、registry 构建及完整 wheel/npm 安装验证。**新增审查修复详见 `hardening-validation.md`。
+
+实际远端基线 `607710c` 的 [GitHub Actions](https://github.com/aspirincap/motata/actions/runs/34204671149) 已通过：Ubuntu Python 3.11/3.13 各 339 Python + 11 Node；Windows Python 3.11 为 339 Python + 10 Node 通过，1 项 POSIX Node fixture 跳过。0.2.0 候选提交使用同一门禁，最终状态见 [分支 CI](https://github.com/aspirincap/motata/actions/workflows/release-check.yml?query=branch%3Acodex%2Fhardening-release-0.2.0)。
 
 ## 5. 接手复现命令
 
@@ -109,8 +111,8 @@ wheelhouse 按 `requirements-release.txt` 准备；依赖预备需要网络，�
 
 1. **已完成审查并收齐源码**：保留 common、services、renderer、registry、CI、scripts 与 tests，排除凭据和本机运行产物。
 2. **已完成本地门禁**：339 项 Python、11 项 Node、registry 构建与完整 wheel/npm 安装验证通过。
-3. **提交并运行实际 CI**：已获用户授权，在工作分支提交并 push；Linux Python 3.11/3.13 与 Windows Python 3.11 验证通过后继续。
-4. **准备 0.2.0**：用户已确认版本号；同步 package.json、pyproject.toml、`__version__`、skills compatibility，并补 release notes/迁移说明，重新验证候选版本。
+3. **已提交并运行实际 CI**：完整源码与跨平台修复已 push 到工作分支，Linux Python 3.11/3.13 与 Windows Python 3.11 验证通过。
+4. **已准备 0.2.0**：版本、skills compatibility 与 [release notes/升级说明](releases/0.2.0.md) 已同步；候选版本继续通过同一门禁验证。审计产物位于 `dist/0.2.0/`，以 manifest 中的 Git SHA 为源码依据。
 5. **另行确认真实账户验收与发布**：先只读验证权限/字段；任何 live probe、创建、更新、删除、npm/PyPI 发布或 Cloudflare 部署须单独确认。不要把“用户要求代码实施”解释为持续远端操作授权。
 
 ## 7. 已知边界与后续事项
@@ -130,3 +132,4 @@ wheelhouse 按 `requirements-release.txt` 准备；依赖预备需要网络，�
 - [执行与恢复契约](execution-contracts.md)
 - [架构与模块边界](architecture.md)
 - [构建发布工程](release-engineering.md)
+- [0.2.0 发布说明与升级注意](releases/0.2.0.md)

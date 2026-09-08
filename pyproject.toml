@@ -1,6 +1,6 @@
 [project]
 name = "motata-cli"
-version = "0.1.9"
+version = "0.2.0"
 description = "Motata CLI for Meta ad delivery, discovery, validation, migration, and TikTok operations."
 readme = "README.md"
 requires-python = ">=3.11"

@@ -2,7 +2,7 @@
 
 ## 交付状态
 
-四阶段代码、测试和文档已审查并收齐，按用户授权提交到 `codex/hardening-release-0.2.0`。此轮验证基线暂保持 `0.1.9`，真实 CI 通过后准备用户确认的 `0.2.0`；未执行 npm/PyPI 发布或 Cloudflare 部署。
+四阶段代码、测试和文档已审查并收齐，按用户授权提交到 `codex/hardening-release-0.2.0`。真实 Linux/Windows CI 已通过，随后同步 CLI/npm/Python 版本为用户确认的 `0.2.0`，新增 `motata-skills-2026-09-08` 兼容记录并保留 0.1.9 历史记录。当前为未发布候选；未合并 main、未创建发布标签、未执行 npm/PyPI 发布或 Cloudflare 部署。
 
 ## 2026-09-08 提交前审查与重验
 
@@ -12,7 +12,7 @@
 - Windows npm/npx 通过 Node 入口执行，保留包含 shell 字符的参数；畸形兼容清单回落本地，远端读取有大小上限。
 - Registry 拒绝隐藏/运行产物目录和凭据文件名大小写变体；脚本指导优先使用可跨安装渠道调用的 CLI。
 - Windows CI 扩为全套 Python 测试，Python/Node 使用独立步骤；USERPROFILE 指向测试临时目录。
-- 555 个候选源码文件通过路径、符号链接和常见凭据特征检查；在独立复制目录中完成下表验证。构建依赖按 `requirements-release.txt` 安装到临时 venv，安装验证仅使用本地 wheelhouse。
+- 最终 556 个候选源码文件通过路径、符号链接和常见凭据特征检查；在独立复制目录中完成下表验证。构建依赖按 `requirements-release.txt` 安装到临时 venv，安装验证仅使用本地 wheelhouse。
 
 ### 阶段一
 
@@ -47,7 +47,7 @@
 
 ## 验证结果
 
-本机：macOS、Python 3.14.2。单测以临时 HOME/MOTATA_HOME 和 socket 审计钩子隔离，Python 子进程继承禁网保护。Node 并发测试使用假 Python/pip，不安装实际 runtime。
+本机：macOS、Python 3.14.2 与真实 Python 3.11.9。单测以临时 HOME/MOTATA_HOME 和 socket 审计钩子隔离，Python 子进程继承禁网保护。Node 并发测试使用假 Python/pip，不安装实际 runtime。
 
 | 验证 | 结果 |
 |---|---|
@@ -62,6 +62,22 @@
 | `git diff --check` | 通过 |
 
 公共依赖仅下载到临时目录；安装 smoke 使用 `PIP_NO_INDEX` 和本地 wheelhouse，不修改全局环境。所有广告 API 行为均为 mock，未调用真实广告平台。
+
+同步 0.2.0 后已再次在独立候选目录验证：Python 3.11.9 与 3.14.2 各 339 项通过，Node 11 项通过，5 个 skills 构建通过；0.2.0 wheel/sdist/npm 清单、sdist 重建 wheel、临时 wheel/npm 安装及 CLI help 全部通过。
+
+## 实际 GitHub Actions 验证
+
+基线提交 `607710c51a38500679b303e3047c7c0448c99b9a` 的 [CI 运行 34204671149](https://github.com/aspirincap/motata/actions/runs/34204671149) 全部通过：
+
+| 环境 | 实际结果 |
+|---|---|
+| Ubuntu / Python 3.11 / Node 20 | 339 Python、11 Node；registry、打包与完整离线安装通过 |
+| Ubuntu / Python 3.13 / Node 20 | 339 Python、11 Node；registry、打包与完整离线安装通过 |
+| Windows / Python 3.11 / Node 20 | 339 Python、10 Node 通过；1 项依赖 POSIX shebang 的 Node 并发 fixture 按设计跳过 |
+
+首次远端验证发现并修复了两类本机未暴露的问题：Python 3.11 不支持旧分类代码的 f-string 表达式反斜杠；Linux 用户命名空间映射导致 checkout 权限被拒绝。后续 Windows 完整套件发现两个测试使用固定 `/` 分隔符，现按路径组件比较。所有 477 个 tracked Python 文件也通过真实 Python 3.11.9 语法解析。
+
+0.2.0 版本候选继续使用同一 workflow；具体提交的最终状态以 [分支 CI 记录](https://github.com/aspirincap/motata/actions/workflows/release-check.yml?query=branch%3Acodex%2Fhardening-release-0.2.0) 为准。本地候选包通过审计后保存在 `dist/0.2.0/`，manifest 记录准确源码提交，SHA256SUMS 校验产物。
 
 ## 复现
 
@@ -78,7 +94,7 @@ python3 scripts/build_skill_registry.py
 ## 仍需区分的边界
 
 - 未进行真实账户读写验收，不能由 mock 通过推导当前平台权限、API 版本与资产可用性。
-- Linux Python 3.11/3.13 与 Windows Python 3.11 的实际 CI 由本次分支 push 触发；远端结果在版本准备时记录。
+- Windows 已运行完整 Python 与 Node 回归；wheel/npm 安装烟测和 POSIX Node 多进程初始化竞争由两个 Linux job 覆盖，不宣称已完成 Windows 安装烟测。
 - 迁移无法可靠关联的未知写入需要人工核验；不提供绕过保护的自动收养或自动删除。
 - TikTok copy/bootstrap 有部分成功清单，但不是 Meta migration 的可恢复 ledger 工作流。
 - skill snapshot 哈希一致不等于本机已安装内容逐字节验证；无法验证时返回 unknown。

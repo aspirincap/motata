@@ -379,7 +379,7 @@ Use the same `--job-id` with `resume`. Confirmed operations are skipped; uncerta
 - Pagination limits are explicit. Monetary aggregation and rankings remain within a currency; unknown currencies remain account-isolated. No automatic FX conversion is performed.
 - npm runtime checks Python >=3.11, repairs incomplete installs, serializes initialization, and preserves the caller's working directory.
 - Published skills have a single source: `registry/skills/`. Root copies, `skills/` symlinks and local agent installations are not release sources.
-- This working tree contains unreleased hardening changes; no package or registry is published by the test/build commands below.
+- Version 0.2.0 is prepared as an unreleased candidate on this branch. Review the [0.2.0 release notes and upgrade guidance](docs/releases/0.2.0.md); test/build commands do not publish packages or the registry.
 
 ```bash
 python3 scripts/run_offline_tests.py

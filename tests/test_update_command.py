@@ -154,7 +154,7 @@ class UpdateCommandTests(unittest.TestCase):
         )
 
         self.assertIsNotNone(release)
-        self.assertEqual(release["bundle_id"], "motata-skills-2026-05-15")
+        self.assertEqual(release["bundle_id"], "motata-skills-2026-09-08")
         self.assertIn("motata-report", release["required_skills"])
 
     def test_compatibility_release_supports_legacy_alias(self) -> None:
@@ -165,7 +165,7 @@ class UpdateCommandTests(unittest.TestCase):
         )
 
         self.assertIsNotNone(release)
-        self.assertEqual(release["bundle_id"], "motata-skills-2026-05-15")
+        self.assertEqual(release["bundle_id"], "motata-skills-2026-09-08")
 
     def test_compatibility_manifest_url_uses_well_known_endpoint(self) -> None:
         url = update_module.compatibility_manifest_url(DEFAULT_SOURCE)
@@ -219,7 +219,7 @@ class UpdateCommandTests(unittest.TestCase):
             update_module.fetch_remote_compatibility_manifest = original_fetch
 
         self.assertIsNotNone(release)
-        self.assertEqual(release["bundle_id"], "motata-skills-2026-05-15")
+        self.assertEqual(release["bundle_id"], "motata-skills-2026-09-08")
 
     def test_fetch_remote_manifest_sends_user_agent(self) -> None:
         class FakeResponse:
