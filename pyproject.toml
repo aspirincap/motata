@@ -12,8 +12,19 @@ dependencies = [
   "urllib3>=1.26.18,<3",
 ]
 
+[project.optional-dependencies]
+gateway = [
+  "PyJWT[crypto]>=2.13.0,<3",
+  "cryptography>=46.0.4,<47",
+  "httpx>=0.28.1,<0.29",
+  "pydantic>=2.13.4,<3",
+  "uvicorn>=0.48.0,<0.49",
+]
+
 [project.scripts]
 motata = "motata_cli.__main__:main"
+motata-gateway = "motata_gateway.__main__:main"
+motata-gateway-admin = "motata_gateway.admin:main"
 motata-handoff = "motata_cli.handoff:main"
 motata-token = "motata_cli.auth_center.fetch_token:main"
 motata-auth-center-token = "motata_cli.auth_center.fetch_token:main"
@@ -26,4 +37,4 @@ build-backend = "setuptools.build_meta"
 motata_cli = ["skills_compatibility.json", "_vendor/NOTICE.md", "_vendor/tiktok_business_api_sdk/LICENSE"]
 
 [tool.setuptools.packages.find]
-include = ["motata_cli*"]
+include = ["motata_cli*", "motata_gateway*"]

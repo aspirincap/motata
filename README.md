@@ -1,5 +1,7 @@
 # motata-cli
 
+> Experimental JWT Gateway work is on this branch. See [gateway runbook](docs/gateway.md) and [implementation status](docs/gateway-implementation-status.md). The full CLI gateway migration is **not complete**; unsupported gateway operations fail closed. Direct mode remains compatible. The legacy examples below describe direct mode; gateway-mode agents must follow the gateway runbook and must not use token helpers.
+
 `motata` is a modular ads operations CLI for Meta and TikTok.
 It is designed for real account work: onboarding, asset discovery, validation, reporting, migration, and cross-account analysis.
 

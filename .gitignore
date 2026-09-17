@@ -59,3 +59,7 @@ scripts/*
 # Only the canonical registry source is versioned, not local agent installs.
 registry/*
 !registry/skills/
+
+# Gateway verification and inventory scripts.
+!scripts/gateway_inventory.py
+!scripts/check_gateway.py

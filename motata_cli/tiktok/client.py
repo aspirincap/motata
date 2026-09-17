@@ -8,6 +8,7 @@ from typing import Any
 
 import requests
 
+from motata_cli.transport.gateway import GatewayAuthRef, RemoteGatewayTransport, gateway_enabled, auth_ref
 from motata_cli.common.errors import CliError
 from motata_cli.common.security import network_error, redact
 
@@ -48,7 +49,17 @@ class TikTokClient:
     BASE_URL = "https://business-api.tiktok.com/open_api/v1.3/"
     PAGE_GET_URL = "https://business-api.tiktok.com/open_api/v1.3/page/get/"
 
-    def __init__(self, access_token: str):
+    def __init__(self, access_token: str | GatewayAuthRef | None):
+        self.gateway = None
+        self.auth_ref = None
+        if isinstance(access_token, GatewayAuthRef) or gateway_enabled():
+            if access_token is not None and not isinstance(access_token, GatewayAuthRef):
+                raise CliError("Direct access tokens are disabled in gateway mode.", exit_code=2)
+            self.auth_ref = access_token or auth_ref("tiktok")
+            self.gateway = RemoteGatewayTransport.from_environment()
+            self.access_token = None
+            # Do not create the SDK's thread pool or secret-bearing client for gateway reads.
+            return
         self.access_token = access_token
         self.sdk = get_business_api_client()
         self.api_client = self.sdk.ApiClient()
@@ -68,6 +79,8 @@ class TikTokClient:
         self.identity_api = self.sdk.IdentityApi(self.api_client)
 
     def _invoke(self, fn, *args, **kwargs) -> dict[str, Any]:
+        if getattr(self, "gateway", None) is not None:
+            raise CliError("GATEWAY_OPERATION_UNAVAILABLE: this SDK path is not migrated yet.")
         kwargs["_request_timeout"] = _SDK_TIMEOUT
         try:
             return _to_plain(fn(*args, **kwargs))
@@ -115,6 +128,10 @@ class TikTokClient:
         json_body: dict[str, Any] | None = None,
         timeout: int = 60,
     ) -> dict[str, Any]:
+        if getattr(self, "gateway", None) is not None:
+            envelope = self.gateway.request(auth=self.auth_ref, method=method.upper(), path=path,
+                                            query=params, body=json_body)
+            return self._check_response(envelope["data"])
         serialized_params: dict[str, Any] = {}
         for key, value in (params or {}).items():
             if value is None or value == [] or value == {}:
@@ -1293,3 +1310,7 @@ class TikTokClient:
 
     def generate_smart_text(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._invoke(self.creative_api.creative_smart_text_generate, self.access_token, body=payload)
+
+    def close(self) -> None:
+        if getattr(self, "gateway", None) is not None:
+            self.gateway.close()
