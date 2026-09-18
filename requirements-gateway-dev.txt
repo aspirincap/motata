@@ -1,0 +1,6 @@
+# Gateway verification dependencies; existing CLI regression requirements remain separate.
+PyJWT[crypto]==2.13.0
+cryptography==46.0.4
+httpx==0.28.1
+pydantic==2.13.4
+uvicorn==0.48.0

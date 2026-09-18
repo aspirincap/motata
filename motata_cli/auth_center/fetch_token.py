@@ -210,6 +210,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from motata_cli.transport.gateway import gateway_enabled
+    if gateway_enabled():
+        print("Token export is disabled in gateway mode. Use the trusted server administration entry.", file=sys.stderr)
+        return 2
     parser = build_arg_parser()
     args = parser.parse_args(argv)
 

@@ -1,0 +1,16 @@
+{
+  "state_dir": "/var/lib/motata-gateway",
+  "issuer": "https://auth.example.com",
+  "audience": "motata-gateway",
+  "jwks_path": "/etc/motata-gateway/jwks.json",
+  "algorithm": "ES256",
+  "meta_version": "v23.0",
+  "limits": {
+    "admitted": 64,
+    "upstream": 20,
+    "per_account": 2,
+    "queue_wait": 30,
+    "request_bytes": 1048576,
+    "response_bytes": 8388608
+  }
+}
