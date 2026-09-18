@@ -11,7 +11,7 @@ import sqlite3
 import stat
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from cryptography.fernet import Fernet, InvalidToken
 from .errors import GatewayError
@@ -32,6 +32,19 @@ class CredentialLease:
     reference: str
     platform: str
     value: str = field(repr=False)
+    expires_at: float | None = None
+    token_version: int | None = None
+    sensitive_values: tuple[str, ...] = field(default=(), repr=False)
+    cache_key: tuple | None = field(default=None, repr=False)
+
+
+@dataclass(frozen=True)
+class CredentialDescriptor:
+    reference: str
+    platform: str
+    provider: str
+    binding_json: str
+    revision: int
 
 
 class GatewayState:
@@ -75,9 +88,22 @@ class GatewayState:
                     state TEXT NOT NULL, result TEXT, updated_at INTEGER NOT NULL,
                     PRIMARY KEY(owner,idem));
                 ''')
+                # Explicit admin init is also the non-destructive v2 schema migration.
+                columns = {row[1] for row in db.execute('PRAGMA table_info(credentials)')}
+                for name, definition in (
+                    ('provider', "TEXT NOT NULL DEFAULT 'direct'"),
+                    ('binding', "TEXT NOT NULL DEFAULT '{}'"),
+                    ('revision', 'INTEGER NOT NULL DEFAULT 1'),
+                ):
+                    if name not in columns:
+                        db.execute(f'ALTER TABLE credentials ADD COLUMN {name} {definition}')
         # Check schema before accepting requests; a missing migration must fail startup.
         with self.connection() as db:
-            db.execute('SELECT subject FROM grants LIMIT 1')
+            try:
+                db.execute('SELECT provider,binding,revision FROM credentials LIMIT 1')
+                db.execute('SELECT subject FROM grants LIMIT 1')
+            except sqlite3.DatabaseError:
+                raise ValueError('Protected state requires offline admin init/migration') from None
         self.resolve_count = 0  # Safe diagnostic counter; never a token label.
 
     @contextmanager
@@ -98,15 +124,55 @@ class GatewayState:
         raw = json.dumps({'ref': reference, 'platform': platform, 'token': token}).encode()
         encrypted = self.cipher.encrypt(raw)
         with self.connection() as db:
-            db.execute('INSERT INTO credentials VALUES(?,?,?,1,?) ON CONFLICT(ref) DO UPDATE SET '
-                       'platform=excluded.platform,ciphertext=excluded.ciphertext,active=1,updated_at=excluded.updated_at',
+            db.execute("INSERT INTO credentials(ref,platform,ciphertext,active,updated_at,provider,binding,revision) "
+                       "VALUES(?,?,?,1,?,'direct','{}',1) ON CONFLICT(ref) DO UPDATE SET "
+                       "platform=excluded.platform,ciphertext=excluded.ciphertext,active=1,updated_at=excluded.updated_at,"
+                       "provider='direct',binding='{}',revision=credentials.revision+1",
                        (reference, platform, encrypted, int(time.time())))
+
+    def put_auth_center_binding(self, reference: str, binding):
+        """Trusted offline declaration; never call fallback account-token APIs.
+
+        The administrator must verify the account/OAuth identity association.
+        This binding is NOT evidence automatically discovered from Auth Center.
+        """
+        from .auth_center import AuthCenterBinding, NAME
+        if not isinstance(binding, AuthCenterBinding) or not NAME.fullmatch(reference):
+            raise ValueError('Invalid Auth Center binding')
+        with self.connection() as db:
+            db.execute("INSERT INTO credentials(ref,platform,ciphertext,active,updated_at,provider,binding,revision) "
+                       "VALUES(?,?,?,1,?,'auth_center',?,1) ON CONFLICT(ref) DO UPDATE SET "
+                       "platform=excluded.platform,ciphertext=excluded.ciphertext,active=1,updated_at=excluded.updated_at,"
+                       "provider='auth_center',binding=excluded.binding,revision=credentials.revision+1",
+                       (reference, binding.platform, b'', int(time.time()),
+                        json.dumps(asdict(binding), sort_keys=True)))
+
+    def describe(self, reference: str, platform: str) -> CredentialDescriptor:
+        with self.connection() as db:
+            row = db.execute('SELECT provider,binding,revision FROM credentials WHERE ref=? AND platform=? AND active=1',
+                             (reference, platform)).fetchone()
+        if not row:
+            raise GatewayError('AUTH_REQUIRED', 503, 'Platform authorization is unavailable.')
+        return CredentialDescriptor(reference, platform, *row)
+
+    @staticmethod
+    def require_binding_scope(provider: str, binding_json: str, workspace: str, platform: str, account: str):
+        if provider == 'direct':
+            return
+        try:
+            from .auth_center import AuthCenterBinding
+            if provider != 'auth_center':
+                raise ValueError('Unknown provider')
+            AuthCenterBinding(**json.loads(binding_json)).require_scope(workspace, platform, account)
+        except (ValueError, TypeError, KeyError):
+            raise GatewayError('CREDENTIAL_UNAVAILABLE', 503, 'Credential binding is invalid.') from None
 
     def grant(self, *, subject: str, client: str, workspace: str, platform: str, account: str, reference: str):
         with self.connection() as db:
-            row = db.execute('SELECT platform FROM credentials WHERE ref=? AND active=1', (reference,)).fetchone()
+            row = db.execute('SELECT platform,provider,binding FROM credentials WHERE ref=? AND active=1', (reference,)).fetchone()
             if not row or row[0] != platform:
                 raise ValueError('Credential reference does not match platform')
+            self.require_binding_scope(row[1], row[2], workspace, platform, account)
             db.execute('INSERT OR REPLACE INTO grants VALUES(?,?,?,?,?,?)',
                        (subject, client, workspace, platform, account, reference))
 
@@ -139,17 +205,18 @@ class GatewayState:
                                 ('jti', principal.token_id), ('kid', principal.key_id)):
                 if db.execute('SELECT 1 FROM revoked WHERE kind=? AND value=?', (kind, value)).fetchone():
                     raise GatewayError('UNAUTHENTICATED', 401, 'Gateway authorization has been revoked.')
-            row = db.execute('SELECT g.ref FROM grants g JOIN credentials c ON c.ref=g.ref '
+            row = db.execute('SELECT g.ref,c.provider,c.binding FROM grants g JOIN credentials c ON c.ref=g.ref '
                              'WHERE g.subject=? AND g.client=? AND g.workspace=? AND g.platform=? '
                              'AND g.account=? AND c.active=1 AND c.platform=g.platform',
                              (principal.subject, principal.client_id, principal.workspace_id, platform, account)).fetchone()
         if not row or (reference is not None and reference != row[0]):
             raise GatewayError('FORBIDDEN', 403, 'Account access is not authorized.')
+        self.require_binding_scope(row[1], row[2], principal.workspace_id, platform, account)
         return row[0]
 
     def resolve(self, reference: str, platform: str) -> CredentialLease:
         with self.connection() as db:
-            row = db.execute('SELECT ciphertext FROM credentials WHERE ref=? AND platform=? AND active=1',
+            row = db.execute("SELECT ciphertext FROM credentials WHERE ref=? AND platform=? AND active=1 AND provider='direct'",
                              (reference, platform)).fetchone()
         if not row:
             raise GatewayError('AUTH_REQUIRED', 503, 'The administrator must configure platform authorization.')
@@ -182,6 +249,18 @@ class GatewayState:
         return hashlib.sha256(json.dumps([principal.workspace_id, principal.subject, principal.client_id,
                                         platform, account], separators=(',', ':')).encode()).hexdigest()
 
+    def lookup_write(self, owner: str, key: str, fingerprint: str) -> dict | None:
+        """Read a receipt before external credential IO; never create pending yet."""
+        with self.connection() as db:
+            row = db.execute('SELECT fingerprint,state,result FROM receipts WHERE owner=? AND idem=?', (owner, key)).fetchone()
+        if row is None:
+            return None
+        if row[0] != fingerprint:
+            raise GatewayError('IDEMPOTENCY_CONFLICT', 409, 'Idempotency key was used for a different request.')
+        if row[1] != 'complete':
+            raise GatewayError('WRITE_NEEDS_REVIEW', 409, 'Previous write needs review; it was not replayed.', 'unknown')
+        return json.loads(row[2])
+
     def begin_write(self, owner: str, key: str, fingerprint: str) -> dict | None:
         with self.connection() as db:
             db.execute('BEGIN IMMEDIATE')
@@ -203,5 +282,5 @@ class GatewayState:
 
     def safe_status(self) -> list[dict]:
         with self.connection() as db:
-            return [dict(zip(('credential_ref', 'platform', 'active', 'updated_at'), row))
-                    for row in db.execute('SELECT ref,platform,active,updated_at FROM credentials ORDER BY ref')]
+            return [dict(zip(('credential_ref', 'platform', 'active', 'updated_at', 'provider', 'revision'), row))
+                    for row in db.execute('SELECT ref,platform,active,updated_at,provider,revision FROM credentials ORDER BY ref')]

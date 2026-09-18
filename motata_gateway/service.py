@@ -14,15 +14,18 @@ from .policy import select, validate_scope, check_objects
 from .protocol import PlatformRequest
 from .responses import PaginationStore, sanitize, strict_json
 from .state import GatewayState
+from .credentials import CredentialResolver
 
 
 class GatewayService:
     def __init__(self, *, verifier: JWTVerifier, state: GatewayState,
                  meta_version: str, limits: Limits | None = None,
-                 http: httpx.AsyncClient | None = None):
+                 http: httpx.AsyncClient | None = None,
+                 credentials: CredentialResolver | None = None):
         if not re.fullmatch(r'v[0-9]{1,2}\.0', meta_version):
             raise ValueError('Explicit reviewed Meta API version required')
         self.verifier, self.state, self.meta_version = verifier, state, meta_version
+        self.credentials = credentials or CredentialResolver(state)
         self.limits = limits or Limits()
         self.scheduler = Scheduler(self.limits)
         self.pages = PaginationStore()
@@ -33,6 +36,7 @@ class GatewayService:
         self.owns_http = http is None
 
     async def close(self):
+        await self.credentials.close()
         if self.owns_http:
             await self.http.aclose()
 
@@ -62,15 +66,29 @@ class GatewayService:
                 {k: v for k, v in request.model_dump().items() if k not in ('request_id', 'idempotency_key')},
                 sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
             if endpoint.write:
+                previous = self.state.lookup_write(owner, request.idempotency_key, fingerprint)
+                if previous is not None:
+                    return {**previous, 'request_id': request.request_id, 'replayed': True}
+            lease = await self.credentials.resolve(reference, request.platform, principal.workspace_id, request.account_id)
+            # External fetch may have waited: recheck identity, grants and ownership
+            # immediately before a write receipt or any requested platform operation.
+            if principal.expires_at <= time.time():
+                raise GatewayError('UNAUTHENTICATED', 401, 'Gateway access token expired while resolving credentials.')
+            self.state.authorize(principal, request.platform, request.account_id, reference)
+            check_objects(request, self.state)
+            if endpoint.write:
                 previous = self.state.begin_write(owner, request.idempotency_key, fingerprint)
                 if previous is not None:
                     return {**previous, 'request_id': request.request_id, 'replayed': True}
-            lease = self.state.resolve(reference, request.platform)
+            secrets = (lease.value, *lease.sensitive_values)
             try:
                 status, data = await self.upstream(request, lease.value)
+                error = data.get('error')
+                if status == 401 or (request.platform == 'meta' and isinstance(error, dict) and error.get('code') == 190):
+                    self.credentials.invalidate(lease)  # NEXT request refetches; never replay this write.
                 # No upstream status is interpreted as safe-to-retry mutation by default.
-                data = self.pages.rewrite(data, request, principal, self.meta_version, (lease.value,))
-                safe = sanitize(data, (lease.value,))
+                data = self.pages.rewrite(data, request, principal, self.meta_version, secrets)
+                safe = sanitize(data, secrets)
                 result = {'protocol': 'motata-gateway/v1', 'request_id': request.request_id,
                           'ok': True, 'status': status, 'data': safe,
                           'write_outcome': 'not_applicable' if not endpoint.write else 'unknown'}

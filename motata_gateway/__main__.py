@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+from .errors import GatewayError
 
 
 def main(argv=None):
@@ -24,17 +25,26 @@ def main(argv=None):
         import uvicorn
         from .jwt_auth import JWTVerifier
         from .state import GatewayState
+        from .auth_center import AuthCenterProvider, load_profiles, private_bytes
+        from .credentials import CredentialResolver
         from .service import GatewayService
         from .server import GatewayApp
         from .limits import Limits
-        config = json.loads(args.config.read_text())
-        if set(config) - {'state_dir', 'issuer', 'audience', 'jwks_path', 'algorithm', 'meta_version', 'limits'}:
+        config = json.loads(private_bytes(args.config, 65536))
+        if set(config) - {'state_dir', 'issuer', 'audience', 'jwks_path', 'algorithm', 'meta_version', 'limits', 'auth_center_profiles'}:
             raise ValueError('Unknown configuration field')
         verifier = JWTVerifier(issuer=config['issuer'], audience=config['audience'],
                                jwks_path=Path(config['jwks_path']), algorithm=config.get('algorithm', 'ES256'))
         state = GatewayState(Path(config['state_dir']))
+        provider = None
+        if 'auth_center_profiles' in config:
+            profile_path = Path(config['auth_center_profiles'])
+            if not profile_path.is_absolute():
+                raise ValueError('Auth Center profile path must be absolute')
+            provider = AuthCenterProvider(load_profiles(profile_path))
         service = GatewayService(verifier=verifier, state=state, meta_version=config['meta_version'],
-                                 limits=Limits(**config.get('limits', {})))
+                                 limits=Limits(**config.get('limits', {})),
+                                 credentials=CredentialResolver(state, provider))
         app = GatewayApp(service, allow_local_http=args.development_http)
         # One worker owns the global limits. Multiple workers would multiply quotas.
         uvicorn.run(app, host=args.host, port=args.port, workers=1, proxy_headers=False,
@@ -44,7 +54,7 @@ def main(argv=None):
         return 0
     except ImportError:
         parser.exit(1, 'Install the gateway extra on the server: python -m pip install ".[gateway]"\n')
-    except (OSError, ValueError, KeyError):
+    except (OSError, ValueError, KeyError, TypeError, GatewayError):
         parser.exit(1, 'Gateway configuration or protected state is invalid. No credential details were printed.\n')
 
 if __name__ == '__main__':
