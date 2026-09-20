@@ -34,8 +34,28 @@ def validate_tree(value, depth=0):
             except (ValueError, RecursionError):
                 return
             validate_tree(decoded, depth + 1)
-    elif value is not None and type(value) not in (int, float, bool):
+    elif type(value) is float:
+        import math
+        if not math.isfinite(value):
+            raise ValueError('Non-finite numeric value')
+    elif value is not None and type(value) not in (int, bool):
         raise ValueError('Unsupported JSON value')
+
+
+class UploadSpec(BaseModel):
+    model_config = ConfigDict(extra='forbid', strict=True)
+    field: str = Field(pattern=r'^[A-Za-z][A-Za-z0-9_]{0,63}$')
+    filename: str = Field(min_length=1, max_length=200)
+    content_type: str = Field(pattern=r'^[A-Za-z0-9.+-]+/[A-Za-z0-9.+-]+$')
+    size: int = Field(ge=0, le=4_000_000_000)
+    sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+
+    @field_validator('filename')
+    @classmethod
+    def safe_filename(cls, value):
+        if any(ord(c) < 32 or c in '\\/:"' for c in value) or value in ('.', '..'):
+            raise ValueError('Unsafe filename')
+        return value
 
 
 class PlatformRequest(BaseModel):
@@ -49,8 +69,10 @@ class PlatformRequest(BaseModel):
     path: str
     query: dict = Field(default_factory=dict)
     body: dict | None = None
+    page_credential_ref: str | None = Field(default=None, pattern=r'^[A-Za-z0-9_-]{16,64}$')
     body_encoding: Literal['json', 'form'] = 'json'
     idempotency_key: str | None = Field(default=None, max_length=128)
+    uploads: list[UploadSpec] = Field(default_factory=list, max_length=8)
 
     @field_validator('request_id', 'credential_ref', 'idempotency_key')
     @classmethod
@@ -69,6 +91,11 @@ class PlatformRequest(BaseModel):
 
     @model_validator(mode='after')
     def payload(self):
+        if self.uploads:
+            if self.method != 'POST' or len({x.field for x in self.uploads}) != len(self.uploads):
+                raise ValueError('Invalid upload metadata')
+            if set(x.field for x in self.uploads).intersection(self.body or {}):
+                raise ValueError('Upload field collides with business field')
         validate_tree(self.query)
         validate_tree(self.body)
         if self.method in ('GET', 'DELETE') and self.body:

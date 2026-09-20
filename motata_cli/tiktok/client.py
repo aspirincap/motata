@@ -58,11 +58,14 @@ class TikTokClient:
             self.auth_ref = access_token or auth_ref("tiktok")
             self.gateway = RemoteGatewayTransport.from_environment()
             self.access_token = None
-            # Do not create the SDK's thread pool or secret-bearing client for gateway reads.
-            return
-        self.access_token = access_token
+        else:
+            self.access_token = access_token
         self.sdk = get_business_api_client()
-        self.api_client = self.sdk.ApiClient()
+        if self.gateway is not None:
+            from motata_cli.transport.tiktok_sdk import GatewaySDKClient
+            self.api_client = GatewaySDKClient(self.gateway, self.auth_ref)
+        else:
+            self.api_client = self.sdk.ApiClient()
         self.auth_api = self.sdk.AuthenticationApi(self.api_client)
         self.account_api = self.sdk.AccountManagementApi(self.api_client)
         self.app_api = self.sdk.APPManagementApi(self.api_client)
@@ -80,7 +83,18 @@ class TikTokClient:
 
     def _invoke(self, fn, *args, **kwargs) -> dict[str, Any]:
         if getattr(self, "gateway", None) is not None:
-            raise CliError("GATEWAY_OPERATION_UNAVAILABLE: this SDK path is not migrated yet.")
+            from motata_cli.transport.tiktok_sdk import SDK_AUTH
+            import inspect
+            try:
+                bound = inspect.signature(fn).bind(*args, **kwargs)
+                if bound.arguments.get('access_token') is not None:
+                    raise CliError("Real platform credentials are forbidden in SDK gateway calls.")
+                bound.arguments['access_token'] = SDK_AUTH
+                return self._check_response(_to_plain(fn(*bound.args, **bound.kwargs)))
+            except CliError:
+                raise
+            except (OSError, ValueError, TypeError, AttributeError):
+                raise CliError("SDK request construction failed in gateway mode; no direct request was made.") from None
         kwargs["_request_timeout"] = _SDK_TIMEOUT
         try:
             return _to_plain(fn(*args, **kwargs))
@@ -449,6 +463,17 @@ class TikTokClient:
         image_url: str | None = None,
         file_id: str | None = None,
     ) -> dict[str, Any]:
+        if (getattr(self, "gateway", None) is not None and isinstance(image_url, str)
+                and image_url.startswith("motata-download:")):
+            # Copy/normalization obtains opaque covers from video metadata. The
+            # platform cannot dereference our private URI: materialize verified
+            # bytes in CLI-private temporary storage and use file upload instead.
+            import tempfile
+            with tempfile.TemporaryDirectory(prefix="motata-cover-") as directory:
+                path = Path(directory) / (Path(file_name or "cover.jpg").name or "cover.jpg")
+                self.gateway.download(image_url, path)
+                return self.upload_image(advertiser_id, str(path), file_name=file_name,
+                                         upload_type="UPLOAD_BY_FILE", file_id=file_id)
         if not file_path and not image_url:
             raise CliError("Image upload requires either file_path or image_url")
 
@@ -619,6 +644,8 @@ class TikTokClient:
         )
 
     def oauth2_advertiser_get(self, app_id: str, secret: str) -> dict[str, Any]:
+        if getattr(self, "gateway", None) is not None:
+            raise CliError("Credential administration is not available on the gateway business channel.")
         return self._invoke(self.auth_api.oauth2_advertiser_get, app_id, secret, self.access_token)
 
     def update_account(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -690,6 +717,8 @@ class TikTokClient:
         if page_size is not None:
             params["page_size"] = page_size
 
+        if getattr(self, "gateway", None) is not None:
+            return self._raw_request("GET", "page/get/", params=params, timeout=30)
         try:
             response = requests.get(
                 self.PAGE_GET_URL,

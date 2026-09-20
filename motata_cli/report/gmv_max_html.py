@@ -802,12 +802,12 @@ def cache_preview_images(run_dir: Path, previews: dict[str, dict[str, Any]], *, 
         video_info = video.get("video_info")
         video_info = video_info if isinstance(video_info, dict) else {}
         cover_url = str(video_info.get("video_cover_url") or "").strip()
-        if cover_url and not cover_url.startswith(("http://", "https://")):
+        if cover_url and not cover_url.startswith(("http://", "https://", "motata-download:")):
             cover_urls[str(item_id)] = cover_url
         elif cover_url:
             cover_urls[str(item_id)] = cover_url
-    remote_cover_urls = {item_id: url for item_id, url in cover_urls.items() if url.startswith(("http://", "https://"))}
-    local_cover_urls = {item_id: url for item_id, url in cover_urls.items() if not url.startswith(("http://", "https://"))}
+    remote_cover_urls = {item_id: url for item_id, url in cover_urls.items() if url.startswith(("http://", "https://", "motata-download:"))}
+    local_cover_urls = {item_id: url for item_id, url in cover_urls.items() if not url.startswith(("http://", "https://", "motata-download:"))}
     local_cover_urls.update(cache_remote_images(run_dir, remote_cover_urls, relative_dir="assets/gmv_max_previews", timeout=timeout, max_bytes=1_500_000))
     return local_cover_urls
 
@@ -820,12 +820,12 @@ def cache_avatar_images(run_dir: Path, previews: dict[str, dict[str, Any]], *, t
         identity = video.get("identity_info")
         identity = identity if isinstance(identity, dict) else {}
         avatar_url = str(identity.get("profile_image") or identity.get("avatar_url") or "").strip()
-        if avatar_url and not avatar_url.startswith(("http://", "https://")):
+        if avatar_url and not avatar_url.startswith(("http://", "https://", "motata-download:")):
             avatar_urls[str(item_id)] = avatar_url
         elif avatar_url:
             avatar_urls[str(item_id)] = avatar_url
-    remote_avatar_urls = {item_id: url for item_id, url in avatar_urls.items() if url.startswith(("http://", "https://"))}
-    local_avatar_urls = {item_id: url for item_id, url in avatar_urls.items() if not url.startswith(("http://", "https://"))}
+    remote_avatar_urls = {item_id: url for item_id, url in avatar_urls.items() if url.startswith(("http://", "https://", "motata-download:"))}
+    local_avatar_urls = {item_id: url for item_id, url in avatar_urls.items() if not url.startswith(("http://", "https://", "motata-download:"))}
     local_avatar_urls.update(cache_remote_images(run_dir, remote_avatar_urls, relative_dir="assets/gmv_max_avatars", timeout=timeout, max_bytes=500_000))
     return local_avatar_urls
 
@@ -836,12 +836,12 @@ def cache_product_images(run_dir: Path, products: dict[str, dict[str, Any]], *, 
         if not isinstance(detail, dict):
             continue
         image_url = str(detail.get("product_image_url") or detail.get("image_url") or "").strip()
-        if image_url and not image_url.startswith(("http://", "https://")):
+        if image_url and not image_url.startswith(("http://", "https://", "motata-download:")):
             image_urls[str(item_group_id)] = image_url
         elif image_url:
             image_urls[str(item_group_id)] = image_url
-    remote_urls = {item_group_id: url for item_group_id, url in image_urls.items() if url.startswith(("http://", "https://"))}
-    local_urls = {item_group_id: url for item_group_id, url in image_urls.items() if not url.startswith(("http://", "https://"))}
+    remote_urls = {item_group_id: url for item_group_id, url in image_urls.items() if url.startswith(("http://", "https://", "motata-download:"))}
+    local_urls = {item_group_id: url for item_group_id, url in image_urls.items() if not url.startswith(("http://", "https://", "motata-download:"))}
     local_urls.update(cache_remote_images(run_dir, remote_urls, relative_dir="assets/gmv_max_products", timeout=timeout, max_bytes=1_000_000))
     return local_urls
 

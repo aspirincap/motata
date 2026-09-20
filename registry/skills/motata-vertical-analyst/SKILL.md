@@ -4,6 +4,23 @@ description: |
   Motata-powered vertical advertising analyst for Meta and TikTok. Use when the user wants post-campaign review, cross-platform performance diagnosis, daily or weekly ad review, audience optimization, creative/video analysis, landing-page or W2A app-path analysis, budget/bid optimization, attribution/measurement gap diagnosis, metric probing, vertical-specific metric recommendations, HTML reports, or file-based campaign/business data analysis for 电商, 工具/W2A, 短剧, 休闲游戏, 中重度游戏, 金融借贷, 小说, 泛娱乐, 搜索套利, 社交, or 代理商/多类型 accounts. This skill mirrors the ecommerce DTC analyst framework but uses motata CLI, motata-token, motata-ad-ops, Meta/TikTok insights, user-type classification, landing-page/app discovery, metric probe/preset capabilities, and the motata-report subskill for HTML report generation instead of assuming first-party DTC data is always available.
 ---
 
+## Gateway mode takes precedence
+
+When `MOTATA_AUTH_MODE=gateway`, do not run `motata-token`, fetch platform tokens
+with curl, paste secrets, use `--access-token`, or read Auth Center API keys. All
+token-fetch examples below and in referenced files apply only to explicitly
+trusted human/admin **direct mode**, never to a Gateway agent. The Gateway holds
+Meta/TikTok credentials; the CLI uses only its own limited Gateway JWT/session.
+
+For `AUTH_REQUIRED`, use a preconfigured external issuer login (`motata gateway
+--config <private-config> --session <private-session> login`) or ask the trusted
+administrator to restore access. Never downgrade to direct mode. Gateway `init`
+is not yet implemented; do not route Gateway onboarding through the legacy
+interactive token flow. Unsupported endpoints fail closed and remain migration
+work, not permission to fetch credentials. Keep write approvals and existing
+migration `needs_review` rules; read partial report manifests before continuing.
+
+
 # motata-vertical-analyst
 
 Use this skill as the analysis-layer super bundle for Motata advertising intelligence. It keeps the original DTC analyst structure: onboarding, data source detection, capability routing, metric diagnosis, recommendations, and skill chaining. The data plane is Motata, not Attribuly.

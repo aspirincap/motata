@@ -1,0 +1,24 @@
+{
+  "state_dir": "/var/lib/motata-gateway",
+  "issuer": "https://auth.example.com",
+  "audience": "motata-gateway",
+  "algorithm": "ES256",
+  "meta_version": "v23.0",
+  "limits": {
+    "admitted": 64,
+    "upstream": 20,
+    "per_account": 2,
+    "queue_wait": 30,
+    "request_bytes": 1048576,
+    "response_bytes": 8388608
+  },
+  "jwks_url": "https://auth.example.com/.well-known/jwks.json",
+  "jwks_cache_ttl": 300,
+  "rates": {
+    "global_rate": 20,
+    "account_rate": 5,
+    "burst": 20,
+    "account_burst": 5,
+    "wait_timeout": 30
+  }
+}

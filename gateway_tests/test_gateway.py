@@ -524,7 +524,7 @@ class CLIIntegrationTests(GatewayTests):
         self.assertEqual(len(self.seen), 1)
 
     async def test_cli_unmigrated_command_fails_closed(self):
-        code, output, error = await self.run_cli(['report', 'meta', 'run', '--period', 'daily'])
+        code, output, error = await self.run_cli(['init'])
         self.assertEqual(code, 1)
         self.assertIn('GATEWAY_OPERATION_UNAVAILABLE', error)
         self.assert_no_upstream()

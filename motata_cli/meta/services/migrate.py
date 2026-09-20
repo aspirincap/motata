@@ -279,7 +279,14 @@ def _execute_migration(args: argparse.Namespace, *, commands_module: Any, state:
         if confirmed:
             uploaded_image_hashes[old_creative_id] = confirmed
             return confirmed
-        thumb_url = commands_module.pick_creative_thumbnail_url(creative)
+        if getattr(source_meta, 'gateway', None) is not None:
+            fresh = commands_module.get_entity(source_meta, str(old_creative_id),
+                ['id','image_url','thumbnail_url','object_story_spec'])
+            creative = {**creative, **fresh}
+        # Prefer the freshly reauthorized original, not the low-resolution
+        # thumbnail. Direct-mode behavior remains unchanged for legacy callers.
+        thumb_url = (creative.get('image_url') if getattr(source_meta, 'gateway', None) is not None else None)
+        thumb_url = thumb_url or commands_module.pick_creative_thumbnail_url(creative)
         if not thumb_url:
             raise commands_module.CliError(
                 f"Creative {old_creative_id} requires an image asset for migration, "

@@ -1,116 +1,110 @@
 # Gateway implementation status
 
-**2026-09-18 — Auth Center credential-provider increment. Full CLI migration is
-NOT complete. No release, merge, production deployment or real platform operation
-was performed.**
+**2026-09-19 — requested SDK/BC/Smart+/GMV Max/report/Page/download/media capability
+increment. Actual local source changes; no GitHub push, package publication, merge,
+server deployment or live advertising operation is claimed.**
 
-## Baseline and evidence
+## Baselines
 
-- Repository: `aspirincap/motata`.
-- Branch: `feat/jwt-gateway-token-isolation`; draft PR #1.
-- Original CLI baseline: `55f8fd452063001b2b608ca9e1e664fed3269b32`.
-- Previous implementation: `0ddc76d23561c23c062a155bb950f284ac1cde5c`.
-- Previous remote CI: 339 Python + 11 Node + 50 gateway tests passed; gateway run
-  `35246002906`, existing release regression run `35246002775`.
-- Current local tests: **339 Python + 11 Node + 94 gateway tests passed** (44 new
-  Auth Center/configuration/pipeline tests). Pack-only wheel/sdist/npm audits pass.
-- Current environment: Linux, Python 3.13.5, Node 22.16.0. Upstream calls mocked;
-  test runner prohibits real network access. Source npm version remains `0.2.0`.
-- CI for the actual pushed commit is the authoritative post-push evidence. This
-  document does not claim a CI result before that run completes.
-- `python scripts/check_gateway.py --release` still intentionally fails because
-  command/network migration coverage remains incomplete.
+- Original repository/CLI: `aspirincap/motata`, `55f8fd452063001b2b608ca9e1e664fed3269b32`.
+- Last remote implementation baseline: `1709e4bee9264ee2e84ebdfe49a2861690387153`,
+  tree `6581324ed68b9e90b399d50b7335e0c1c4c1281a`; Auth Center integration retained.
+- Immediate delivered-source baseline: preceding rebuilt archive, tree
+  `698625788e485fdadb0c5de19d19b22d9c4930c5`. This increment is applied on top of it,
+  not a rename of the old remote CI snapshot.
+- Software version remains `0.2.0`; no release version increment.
+- Local environment: Linux / Python 3.13.5 / Node 22.16.0.
+- Baseline Gateway suite: 157 independent tests. Current suite: **213 tests**,
+  including **56 newly added independent tests**. Tests prohibit real socket network.
+- Exact final command exit codes, timings, logs, patch application and source-tree
+  checks are delivered in `verification/results.json`; listing a command here alone
+  is not evidence that it ran successfully. No local result is called remote CI.
 
-## This increment
+See [current capability completion and upgrade runbook](gateway-completion.md).
+[Previous rebuild notes](gateway-rebuild.md) are historical, including their old
+limits and incomplete-feature descriptions.
 
-Implemented server-only `AuthCenterProvider` and async `CredentialResolver` using
-existing Auth Center OpenAPI at pinned source `96fda9454c02cc15608d89a41333fe8e4283c5d1`:
+## Requested six groups: implemented and fixture-verified
 
-- Fetch exact `{channel}:{oauth_agent_id}`; no account/channel-wide token fallback.
-- Require explicit administrator-verified tenant/platform/account/OAuth binding;
-  reject cross-workspace/account grants. This is an administrator assertion,
-  **not automatic remote account membership verification**.
-- Protected profile/API-key files, fixed HTTPS origin, no redirects, caller JWT,
-  inherited cookies/headers or proxy environment sent to Auth Center.
-- Bounded short-lived positive/negative cache, per-key singleflight, key-file
-  rotation, expiry buffers, invalidation, cancellation and service shutdown.
-- Default positive cache TTL 15 seconds, maximum 60; **remote revocation/quota
-  changes are not immediate while a lease is cached**. Local grants/revocation
-  are rechecked before dispatch even with a warm cache.
-- Recheck JWT/grants/binding after external IO. Credential-fetch failure creates
-  no pending write receipt; completed results replay without fetching a secret.
-- Non-destructive protected-state migration via offline admin `init`; new admin
-  `bind-auth-center` command. No business HTTP credential export/admin endpoints.
-- Fetched platform credentials and raw OAuth responses are not persisted in
-  Gateway SQLite or CLI artifacts. Existing direct encrypted store still works.
+| Group | Current source / evidence |
+|---|---|
+| SDK / BC | All 50 business SDK builders referenced by TikTokClient map to reviewed routes; 1 OAuth inventory builder replaced by grant-only account discovery. 32 raw method/path pairs audited. BC/catatalog/asset metadata filtered by explicit bindings and live account grants. |
+| Smart+ / GMV Max | Three-level Smart+ CRUD/status, singular/plural result evidence, material overview/breakdown, store/product/video/campaign/report paths and multi-advertiser grants; SDK/raw request-building regression. |
+| Full reports | Actual nonempty Meta full/deep incl. application metadata and Page story fallback; TikTok full auction/Smart+ and GMV Max, comparison windows, requested parameters, product and creative rows; completeness asserted. |
+| Page derived credentials | Server-only expiring Page leases, parent credential version/digest and session/account binding; no token in output/SQLite/agent; read-only refresh. Shared Page evidence separated from exclusive ad-object ownership. |
+| Downloads | Server-issued references, public-IP connection pinning, original-host TLS, approved redirects, no credentials/cookies to CDN, private bounded spooling with complete integrity/secret checks before output, atomic CLI writes and cancellation cleanup. |
+| Complete existing media migration | Actual export→run→resume with image original, video+cover, existing-post and Campaign/Adset/Ad creation; expired media reference renewal, no duplicate confirmed writes and unknown-write quarantine. Actual TikTok copy fetches/reuploads cover and keeps DISABLE defaults. |
 
-See [Auth Center integration runbook](gateway-auth-center.md) for installation,
-protected-state migration, exact binding requirements, cache and failure semantics.
+Fixtures: `gateway_tests/test_completion_pages_downloads.py`,
+`test_completion_tiktok.py`, `test_completion_workflows.py`.
+Source-routing manifest: `docs/gateway-endpoint-coverage.json`.
 
-## Phase status against accepted JWT Gateway plan
+## Important upgrade and behavior changes
 
-| Phase | State | Implemented / remaining |
-|---|---|---|
-| 0: inventories | partial | 249 command/alias entries, 58 network-call candidates; semantic full-coverage audit pending. |
-| 1: protocol | partial | HTTPS/JSON + real CLI adapter; UDS/named pipe and streaming pending. |
-| 2: identity and credentials | partial | Asymmetric JWT, local JWKS reload, local grants/revocations, encrypted direct store, Auth Center provider/cache/bindings. Dedicated issuer login/refresh, authoritative remote session/grant integration and online JWKS pending. |
-| 3: request safety | partial | Reviewed endpoints, fixed destinations, bounded slots, secret safety, opaque pagination and durable receipts. Full endpoint review, streaming and actual RPS budgets pending. |
-| 4: Meta reads | partial | Flat account collections/verified objects; CLI campaign list tested. Nested field relationships, async jobs and full report parity pending. |
-| 5: Meta writes/media | partial | Campaign creation with stable-key result replay tested; PAUSED default preserved. Remaining writes/probes/uploads pending. |
-| 6: TikTok reads | partial | Raw campaign/adgroup/ad/integrated-report routes; CLI campaign list tested. SDK, Smart+, GMV Max and other collections pending. |
-| 7: TikTok writes/media | not started | SDK writes/uploads unavailable in gateway mode; direct mode unchanged. |
-| 8: reports/copy/migration | not started | Existing direct regression preserved; full gateway workflow/recovery parity pending. |
-| 9: agent workflow | partial | Startup rejects inherited platform secrets; token helper refuses gateway mode. Canonical Skills/init/login UX pending. |
-| 10: stress/OS | partial | JWT attacks, cross-account checks, queue limits, write uncertainty and 50 mock calls tested; new 50-call provider singleflight/pipeline tests pass. RSS/FD soak, real TLS/OS identity/ACL acceptance pending. |
-| 11: release | partial | Optional gateway dependencies, entrypoints and pack-only byte audit; production release remains blocked. |
+1. Trusted service administrator must run `motata-gateway-admin --state-dir ... init`
+   on existing state. This adds `asset_membership` without deleting credentials,
+   grants or durable receipts. Startup fails closed without that upgrade.
+2. BC/catalog operations require explicit administrator-verified BC membership.
+   `bc/get/` cannot reveal every BC accessible by a broad provider token. Advertiser
+   assets are intersected with current caller grants, not turned into new grants.
+3. Page references expire in at most 300 seconds; media references in 900 seconds.
+   They are in-memory, session/account-bound and reauthorized. Restart/expiry needs
+   metadata refetch; unconfirmed media migration does this before downloading.
+4. Images prefer the reauthorized original image_url; thumbnail is a fallback.
+5. Upload/download use private complete spooling, not zero-disk proxying. Defaults:
+   4 GB decimal per file, 4 concurrent streams for each direction, separate 8 GB
+   spool budgets. Size acceptance is not a measured 4 GB bandwidth guarantee.
+6. `changelog/task/create/` requires read scope but keeps mutation receipts; a
+   report-preparation job is not permission to modify advertising objects.
+7. Dynamic/shared assets do not weaken account grants, resource verification,
+   redirect/origin controls or the no-plaintext-fallback rule.
 
-## Clarified boundaries
+## Project-wide release status (separate from the six requested groups)
 
-1. Current Auth Center browser JWT is NOT a Gateway JWT. Keep dedicated audience,
-   asymmetric verification and `typ=at+jwt`; do not weaken the existing verifier.
-2. Auth Center OAuth `Agent` identities are not AI agent/CLI caller identities.
-3. Auth Center token response currently does not guarantee `token_version`.
-   Optional version is preserved when supplied; no fabricated event/version sync.
-4. Local Gateway grants remain authoritative. No Auth Center session/grant API
-   was invented or claimed deployed. Auth Center source/deployment was untouched.
-5. Object ownership currently comes from reviewed account-scoped listings. Later
-   discovery may require bounded read-only verification after coarse account
-   authorization. Invalid JWT/grants must still cause zero credential fetches.
-6. `AuthContext.access_token` retains a typed non-secret compatibility reference
-   in gateway mode. No real platform token is stored in that agent-side slot.
-7. JWT `jti` is reusable. Mutation idempotency is a separate caller/account-bound
-   key; pending or unknown writes cannot be automatically reset or resent.
-8. Concurrent slots are not an RPS limit. Passing mocks is not production
-   security certification or proof of live platform throughput.
+The strict `--release` gate is retained and remains blocked while the entire
+command/option/network ledger lacks exhaustive completion evidence. Entries
+labeled `fixture_verified` mean only the named end-to-end fixture, not every
+possible platform/account option combination. No blanket `complete` relabeling.
 
-## Next work
+| Area | Status |
+|---|---|
+| JWT, direct store, Auth Center provider | Existing strict JWT and provider/cache/grants/revocations preserved. Device login/refresh CLI and online JWKS from preceding rebuild preserved. |
+| Reviewed SDK/raw route coverage | All current referenced TikTok business SDK routes and concrete raw calls pass dedicated source audit. |
+| Report/Page/media workflow regression | Above requested flows implemented, nonempty mock scenarios pass; live account/API schema acceptance still separate. |
+| Full CLI inventory | 252 command/alias entries, 60 network candidates; structural drift checked. Fixture evidence recorded for actual CLI workflows, remaining per-option review tracked. |
+| Protocol | HTTPS JSON, binary upload, authenticated binary download implemented; UDS/named-pipe deployments not implemented. |
+| Agent workflow | Existing device login/status/local logout and canonical Skills retained; interactive Gateway init/install UX remains separate work. |
+| Production | Not certified; no real TLS/OS-identity/Windows ACL deployment test, long RSS/FD soak, distributed limiter or live quotas proven. |
 
-- [ ] Add dedicated Gateway JWT issuance, CLI browser login and limited refresh
-  in cooperation with the Auth Center project; preserve existing web sessions.
-- [ ] Replace admin binding assertions with a strict remote binding/lease/version
-  contract; add authoritative session/grant checks and bounded revocation events.
-- [ ] Harden Auth Center secret storage and remove OAuth raw-data secret copies;
-  do not assume a column named `*_ciphertext` is actually encrypted.
-- [ ] Complete every Meta relationship/field path and TikTok vendored SDK exit.
-- [ ] Add bounded streaming upload/download and video-session handling.
-- [ ] Migrate full reports, copy and migration, preserving completeness and
-  unknown-write/recovery contracts.
-- [ ] Add platform app/account/endpoint RPS budgets and explicit retry ownership.
-- [ ] Implement trusted receipt reconciliation without an agent replay bypass.
-- [ ] Complete canonical `registry/skills/` and gateway-mode init/login flows.
-- [ ] Validate clean TLS deployment, OS identities, Windows ACL/macOS service
-  isolation, memory/FD soak and installed package behavior.
-- [ ] Only then pass the full-release coverage gate and consider a production PR.
+## Remaining work not represented as completed
 
-## Reproducible commands
+- Actual external issuer device/token/refresh backend and authoritative Auth Center
+  session/grant/binding/version/revocation contracts. This repository's CLI client
+  is not a deployed issuer. Existing browser JWT remains incompatible.
+- Full CLI command/option evidence, including startup/init and specialized variants
+  not covered by these fixtures; unknown Graph aliases/traversals still rejected.
+- Trusted mutation receipt reconciliation with no caller force-replay bypass.
+- Deployment acceptance: real HTTPS/CDN/platform environment, service identity,
+  Windows ACL/macOS service setup, long-running memory/FD tests and installed artifacts.
+- Platform feedback-aware/distributed quota coordination. Current limits are per
+  Gateway process; concurrency is not RPS and neither is a platform quota promise.
+
+Original CLI limitations are not silently rebranded as Gateway features: Meta
+migration currently supports image/link, video and existing-post shapes; it does
+not newly reconstruct arbitrary dynamic/unsupported creatives. TikTok copy still
+has no durable workflow resume ledger and retains partial-object error output.
+
+## Reproduce
 
 ```bash
 python scripts/run_offline_tests.py
 node --test tests/runtime.test.js tests/runtime-lock.test.js
 python scripts/check_gateway.py
+python scripts/check_gateway_endpoints.py
 python scripts/check_release.py --pack-only
-python scripts/check_gateway.py --release  # expected incomplete-coverage failure
+python scripts/build_skill_registry.py
+python scripts/check_gateway.py --release  # strict project-wide coverage failure remains visible
 ```
 
-No real tokens/customer data are in fixtures. No Auth Center key was requested
-from the user or imported into a running server during this implementation.
+All test secrets are synthetic. No credentials or customer data were imported,
+requested or accessed to run this increment's tests.

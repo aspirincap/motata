@@ -4,6 +4,23 @@ description: |
   Safe operational execution layer for Meta and TikTok ads work through motata. Use when the user wants to list accounts, inspect campaigns, discover usable assets, validate promotable objects, run insights, analyze Meta/TikTok landing pages or product-level spend, infer an advertiser/user type from Meta or TikTok token spend + URL/app evidence, troubleshoot API failures, or perform carefully controlled writes with motata. Triggers include "motata", "列出广告账户", "list campaigns", "discover assets", "validate promoted object", "run TikTok insights", "Meta debug", "migrate assets", "Meta落地页", "TikTok落地页", "按产品看消耗", "landing page spend", "用户类型判定", "广告主类型", "classify user type", or "inspect ad account state". This skill reuses `motata token` and the bundled `motata-token` helper for token retrieval, and it focuses on read-first, validate-first execution.
 ---
 
+## Gateway mode takes precedence
+
+When `MOTATA_AUTH_MODE=gateway`, do not run `motata-token`, fetch platform tokens
+with curl, paste secrets, use `--access-token`, or read Auth Center API keys. All
+token-fetch examples below and in referenced files apply only to explicitly
+trusted human/admin **direct mode**, never to a Gateway agent. The Gateway holds
+Meta/TikTok credentials; the CLI uses only its own limited Gateway JWT/session.
+
+For `AUTH_REQUIRED`, use a preconfigured external issuer login (`motata gateway
+--config <private-config> --session <private-session> login`) or ask the trusted
+administrator to restore access. Never downgrade to direct mode. Gateway `init`
+is not yet implemented; do not route Gateway onboarding through the legacy
+interactive token flow. Unsupported endpoints fail closed and remain migration
+work, not permission to fetch credentials. Keep write approvals and existing
+migration `needs_review` rules; read partial report manifests before continuing.
+
+
 # Motata Ad Ops
 
 Use this skill for direct operational work through the `motata` CLI.

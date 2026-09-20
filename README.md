@@ -5,6 +5,13 @@
 `motata` is a modular ads operations CLI for Meta and TikTok.
 It is designed for real account work: onboarding, asset discovery, validation, reporting, migration, and cross-account analysis.
 
+## Latest Gateway capability increment
+
+See [2026-09-19 capability completion](docs/gateway-completion.md) for the actual
+SDK/BC/Smart+/GMV Max, full-report, Page-reference, safe-download and media-migration
+implementation, state upgrade and independent mock-test evidence. These source
+changes do not imply a production release or live-platform certification.
+
 ## What It Covers
 
 `motata` focuses on the workflows that usually break in production ad accounts:

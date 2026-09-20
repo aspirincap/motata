@@ -22,7 +22,8 @@ def commands() -> list[dict]:
             if path:
                 local = path[0] in {'product', 'metrics', 'update'} or path == ['gateway', 'status']
                 rows.append({'command': 'motata ' + ' '.join(path),
-                             'classification': 'LOCAL_NO_CREDENTIAL' if local else 'GATEWAY_PLATFORM_OPERATION',
+                             'classification': ('GATEWAY_SESSION_OPERATION' if path[0] == 'gateway' else
+                                                'LOCAL_NO_CREDENTIAL' if local else 'GATEWAY_PLATFORM_OPERATION'),
                              'handler': getattr(parser.get_default('func'), '__name__', None),
                              'options_sha256': hashlib.sha256(json.dumps(sorted({s for a in parser._actions for s in a.option_strings}), separators=(',', ':')).encode()).hexdigest(),
                              'coverage': 'not_migrated'})
@@ -84,6 +85,15 @@ def main():
     for name, data in pairs:
         path = ROOT / 'docs' / name
         if args.write:
+            # Preserve evidence only for the exact unchanged source identity;
+            # new/changed commands or network sites still require review.
+            identity = lambda row: json.dumps({k: v for k, v in row.items()
+                if k not in ('coverage', 'tests', 'notes')}, sort_keys=True)
+            previous = json.loads(path.read_text())['entries'] if path.exists() else []
+            evidence = {identity(row): row for row in previous}
+            for row in data:
+                old = evidence.get(identity(row), {})
+                row.update({k: old[k] for k in ('coverage', 'tests', 'notes') if k in old})
             path.write_text(json.dumps({'schema_version': 1, 'baseline': '55f8fd452063001b2b608ca9e1e664fed3269b32',
                                         'entries': data}, indent=2) + '\n')
         else:

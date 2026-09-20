@@ -32,6 +32,8 @@ def build_parser() -> argparse.ArgumentParser:
     register_metrics_commands(subparsers)
     register_report_commands(subparsers)
     register_update_command(subparsers)
+    from motata_cli.transport.login import register_gateway_commands
+    register_gateway_commands(subparsers)
     return parser
 
 

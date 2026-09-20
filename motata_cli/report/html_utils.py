@@ -34,6 +34,10 @@ def preview_cell(
 ) -> str:
     cover = str(local_image_url or image_url or "").strip()
     preview = str(preview_url or image_url or local_image_url or "").strip()
+    # Gateway references are not browser URLs. Offline rendering must not embed
+    # unusable privileged references; --cache-images materializes them explicitly.
+    if cover.startswith("motata-download:"): cover = ""
+    if preview.startswith("motata-download:"): preview = local_image_url or ""
     if not cover and not preview:
         return (
             '<div class="preview-cell">'
@@ -97,12 +101,20 @@ def cache_remote_images(
         out_path = cache_dir / f"{slug(key)}.{extension}"
         if not out_path.exists() or out_path.stat().st_size < 512:
             try:
+                if source_url.startswith('motata-download:'):
+                    from motata_cli.transport.gateway import RemoteGatewayTransport
+                    client=RemoteGatewayTransport.from_environment()
+                    try: client.download(source_url,out_path,max_bytes=max_bytes)
+                    finally: client.close()
+                    if out_path.stat().st_size>=512:
+                        cached[str(key)]=str(out_path.relative_to(run_dir))
+                    continue
                 request = urllib.request.Request(source_url, headers={"User-Agent": "Mozilla/5.0"})
                 with urllib.request.urlopen(request, timeout=timeout) as response:
                     data = response.read(max_bytes)
                 if data:
                     out_path.write_bytes(data)
-            except (OSError, urllib.error.URLError, TimeoutError):
+            except (OSError, urllib.error.URLError, TimeoutError, RuntimeError):
                 continue
         if out_path.exists() and out_path.stat().st_size >= 512:
             cached[str(key)] = str(out_path.relative_to(run_dir))

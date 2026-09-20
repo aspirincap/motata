@@ -31,6 +31,7 @@ sys.addaudithook(reject_network)
                    PYTHONPATH=os.pathsep.join((str(home), str(ROOT))), PYTHONDONTWRITEBYTECODE='1')
         subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s', 'gateway_tests', '-v'], cwd=ROOT, env=env, check=True)
         subprocess.run([sys.executable, 'scripts/gateway_inventory.py'], cwd=ROOT, env=env, check=True)
+        subprocess.run([sys.executable, 'scripts/check_gateway_endpoints.py'], cwd=ROOT, env=env, check=True)
         if args.release:
             subprocess.run([sys.executable, 'scripts/gateway_inventory.py', '--release'], cwd=ROOT, env=env, check=True)
     print('Experimental gateway gate passed; this is NOT a complete migration or production security certification.')

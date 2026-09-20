@@ -1,7 +1,27 @@
 ---
 name: motata-token
-description: Fetch access tokens, ad-account inventories, sync status, and token-usage payloads from Auth Center OpenAPI using API keys. Use when Codex needs to retrieve a token for an agent, ad account, or channel; list ad accounts with attached tokens; trigger account sync; inspect agents; or troubleshoot 401/402/403/404 responses.
+description: Trusted direct-mode administrator helper only; never use for a Gateway-mode agent. Fetch access tokens, ad-account inventories, sync status, and token-usage payloads from Auth Center OpenAPI using API keys. Use when Codex needs to retrieve a token for an agent, ad account, or channel; list ad accounts with attached tokens; trigger account sync; inspect agents; or troubleshoot 401/402/403/404 responses.
 ---
+
+## Gateway mode takes precedence
+
+When `MOTATA_AUTH_MODE=gateway`, do not run `motata-token`, fetch platform tokens
+with curl, paste secrets, use `--access-token`, or read Auth Center API keys. All
+token-fetch examples below and in referenced files apply only to explicitly
+trusted human/admin **direct mode**, never to a Gateway agent. The Gateway holds
+Meta/TikTok credentials; the CLI uses only its own limited Gateway JWT/session.
+
+For `AUTH_REQUIRED`, use a preconfigured external issuer login (`motata gateway
+--config <private-config> --session <private-session> login`) or ask the trusted
+administrator to restore access. Never downgrade to direct mode. Gateway `init`
+is not yet implemented; do not route Gateway onboarding through the legacy
+interactive token flow. Unsupported endpoints fail closed and remain migration
+work, not permission to fetch credentials. Keep write approvals and existing
+migration `needs_review` rules; read partial report manifests before continuing.
+
+**This skill is administrator-only in Gateway deployments. Stop here for an
+agent operating in Gateway mode; do not follow the token retrieval steps below.**
+
 
 # Motata Token
 

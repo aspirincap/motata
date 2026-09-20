@@ -32,6 +32,13 @@ class GatewayApp:
         if scope['type'] != 'http':
             return
         request_id = str(uuid.uuid4())
+        started = False
+        original_send = send
+        async def tracked_send(message):
+            nonlocal started
+            if message['type'] == 'http.response.start': started = True
+            await original_send(message)
+        send = tracked_send
         try:
             if scope.get('scheme') != 'https':
                 client = (scope.get('client') or ('', 0))[0]
@@ -40,7 +47,9 @@ class GatewayApp:
             authorization = [v for k, v in scope.get('headers', []) if k.lower() == b'authorization']
             if len(authorization) != 1:
                 raise GatewayError('UNAUTHENTICATED', 401, 'One gateway Authorization header is required.')
-            principal = self.service.authenticate(authorization[0].decode('ascii'))
+            # Bound slow online-JWKS authentication too; not only post-auth requests.
+            async with self.service.scheduler.admission():
+                principal = await self.service.authenticate_async(authorization[0].decode('ascii'))
             if scope['method'] == 'GET' and scope['path'] == '/v1/health':
                 if 'gateway:use' not in principal.scopes:
                     raise GatewayError('INSUFFICIENT_SCOPE', 403, 'Gateway scope is required.')
@@ -51,13 +60,26 @@ class GatewayApp:
                     raise GatewayError('NOT_FOUND', 404, 'Unknown gateway route.')
                 if scope.get('query_string'):
                     raise GatewayError('INVALID_REQUEST', 400, 'URL query parameters are not supported.')
+                if scope['path'].startswith('/v1/downloads/'):
+                    key=scope['path'].removeprefix('/v1/downloads/')
+                    if not re.fullmatch(r'[A-Za-z0-9_-]{16,64}',key):
+                        raise GatewayError('INVALID_REQUEST',400,'Invalid media reference.')
+                    await self.service.send_download(key,principal,send)
+                    return
+                if scope['path'] == '/v1/platform/upload':
+                    async with self.service.uploads.receive(receive,
+                        lambda req: self.service.preauthorize_upload(req, principal)) as (request, files):
+                        request_id = request.request_id
+                        response = await self.service.dispatch(request, principal, files=files)
+                        await self.respond(send, 200, response)
+                    return
                 if scope['path'].startswith('/v1/pages/'):
                     reference = scope['path'][10:]
                     if not re.fullmatch(r'[A-Za-z0-9_-]{16,64}', reference):
                         raise GatewayError('INVALID_REQUEST', 400, 'Invalid pagination reference.')
                     request = self.service.pages.resolve(reference, principal)
                     request = request.model_copy(update={'request_id': request_id})
-                elif scope['path'] == '/v1/platform/request':
+                elif scope['path'] in ('/v1/platform/request', '/v1/objects/resolve', '/v1/accounts', '/v1/meta/page-credentials'):
                     body = bytearray()
                     async with asyncio.timeout(self.service.limits.body_seconds):
                         while True:
@@ -71,20 +93,36 @@ class GatewayApp:
                                 raise GatewayError('REQUEST_TOO_LARGE', 413, 'Gateway request exceeded its byte limit.')
                             if not event.get('more_body', False):
                                 break
-                    request = PlatformRequest.model_validate(strict_json(body))
+                    parsed = strict_json(body)
+                    if scope['path'] == '/v1/accounts':
+                        await self.respond(send, 200, await self.service.list_accounts(parsed, principal))
+                        return
+                    request = PlatformRequest.model_validate(parsed)
                     request_id = request.request_id
+                    if scope['path']=='/v1/meta/page-credentials':
+                        result=await self.service.list_page_credentials(request,principal)
+                        await self.respond(send,200,result)
+                        return
+                    if scope['path'] == '/v1/objects/resolve':
+                        result = await self.service.resolve_object(request, principal)
+                        await self.respond(send, 200, result)
+                        return
                 else:
                     raise GatewayError('NOT_FOUND', 404, 'Unknown gateway route.')
                 response = await self.service.dispatch(request, principal)
                 await self.respond(send, 200, response)
         except GatewayError as error:
+            if started: raise
             await self.respond(send, error.status, error.envelope(request_id))
         except (ValueError, TypeError, UnicodeError, RecursionError):
+            if started: raise
             # Pydantic errors echo inputs; never send those exception strings.
             await self.respond(send, 400, GatewayError('INVALID_REQUEST', 400, 'Invalid gateway request.').envelope(request_id))
         except TimeoutError:
+            if started: raise
             await self.respond(send, 408, GatewayError('BODY_TIMEOUT', 408, 'Request body deadline exceeded.').envelope(request_id))
         except Exception:
+            if started: raise
             # No exception traceback/request object is emitted to a caller or debug log.
             await self.respond(send, 500, GatewayError('INTERNAL_ERROR', 500, 'Gateway operation could not complete.', 'unknown').envelope(request_id))
 

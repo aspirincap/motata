@@ -63,3 +63,5 @@ registry/*
 # Gateway verification and inventory scripts.
 !scripts/gateway_inventory.py
 !scripts/check_gateway.py
+
+!scripts/check_gateway_endpoints.py

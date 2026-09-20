@@ -38,6 +38,12 @@ def main(argv=None):
         p.add_argument('--account', required=True)
         if name == 'grant':
             p.add_argument('--ref', required=True)
+    for operation in ('bind-asset', 'remove-asset'):
+        p = commands.add_parser(operation)
+        p.add_argument('--platform', choices=['meta', 'tiktok'], required=True)
+        p.add_argument('--account', required=True)
+        p.add_argument('--object-id', required=True)
+        p.add_argument('--type', choices=sorted(GatewayState.SHARED_TYPES), required=True)
     p = commands.add_parser('revoke')
     p.add_argument('--kind', choices=['sub', 'sid', 'jti', 'kid'], required=True)
     p.add_argument('--value', required=True)
@@ -59,6 +65,10 @@ def main(argv=None):
                 state.grant(**kwargs, reference=args.ref)
             else:
                 state.remove_grant(**kwargs)
+        elif args.operation == 'bind-asset':
+            state.bind_object(args.platform, args.object_id, args.account, args.type)
+        elif args.operation == 'remove-asset':
+            state.remove_asset(args.platform, args.account, args.object_id, args.type)
         elif args.operation == 'revoke':
             state.revoke(args.kind, args.value)
         elif args.operation == 'disable-credential':

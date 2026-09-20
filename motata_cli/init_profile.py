@@ -70,6 +70,10 @@ def resolve_default_accounts(platform: str) -> tuple[list[str], str | None]:
 
 
 def resolve_default_access_token(platform: str) -> tuple[str | None, str | None]:
+    from motata_cli.transport.gateway import gateway_enabled, GatewayAuthRef, check_agent_environment
+    if gateway_enabled():
+        check_agent_environment()
+        return GatewayAuthRef(platform), "gateway"
     env_vars = PLATFORM_TOKEN_ENV_VARS.get(platform, ())
     value = _env_first(*env_vars)
     if value:

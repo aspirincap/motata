@@ -83,6 +83,9 @@ class GatewayState:
                 CREATE TABLE IF NOT EXISTS ownership (
                     platform TEXT NOT NULL, object_id TEXT NOT NULL, account TEXT NOT NULL,
                     object_type TEXT NOT NULL, PRIMARY KEY(platform,object_id));
+                CREATE TABLE IF NOT EXISTS asset_membership (
+                    platform TEXT NOT NULL, object_id TEXT NOT NULL, account TEXT NOT NULL,
+                    object_type TEXT NOT NULL, PRIMARY KEY(platform,object_id,account,object_type));
                 CREATE TABLE IF NOT EXISTS receipts (
                     owner TEXT NOT NULL, idem TEXT NOT NULL, fingerprint TEXT NOT NULL,
                     state TEXT NOT NULL, result TEXT, updated_at INTEGER NOT NULL,
@@ -102,6 +105,7 @@ class GatewayState:
             try:
                 db.execute('SELECT provider,binding,revision FROM credentials LIMIT 1')
                 db.execute('SELECT subject FROM grants LIMIT 1')
+                db.execute('SELECT account FROM asset_membership LIMIT 1')
             except sqlite3.DatabaseError:
                 raise ValueError('Protected state requires offline admin init/migration') from None
         self.resolve_count = 0  # Safe diagnostic counter; never a token label.
@@ -229,10 +233,26 @@ class GatewayState:
         except (ValueError, KeyError, InvalidToken):
             raise GatewayError('CREDENTIAL_UNAVAILABLE', 503, 'Platform authorization is unavailable.') from None
 
+    SHARED_TYPES = frozenset({'page', 'pixel', 'app', 'instagram', 'image', 'video',
+                              'bc', 'catalog', 'store', 'identity', 'portfolio',
+                              'audience', 'event_set', 'avatar', 'task', 'post'})
+
     def bind_object(self, platform: str, object_id: str, account: str, object_type: str):
+        import re
+        if not re.fullmatch(r'[0-9]{1,32}', account) or not isinstance(object_id, str) or not object_id or len(object_id) > 512 or any(ord(c) < 32 for c in object_id):
+            raise GatewayError('OBJECT_BINDING_CONFLICT', 409, 'Invalid resource identity.')
+        if object_type in self.SHARED_TYPES:
+            with self.connection() as db:
+                db.execute('INSERT OR IGNORE INTO asset_membership VALUES(?,?,?,?)',
+                           (platform, object_id, account, object_type))
+            return
         with self.connection() as db:
             existing = db.execute('SELECT account,object_type FROM ownership WHERE platform=? AND object_id=?',
                                   (platform, object_id)).fetchone()
+            if existing and existing[0] == account and (existing[1] == 'adobject' or object_type == 'adobject'):
+                if existing[1] == 'adobject' and object_type != 'adobject':
+                    db.execute('UPDATE ownership SET object_type=? WHERE platform=? AND object_id=?', (object_type, platform, object_id))
+                return
             if existing and existing != (account, object_type):
                 raise GatewayError('OBJECT_BINDING_CONFLICT', 409, 'Object ownership must be reviewed.')
             db.execute('INSERT OR IGNORE INTO ownership VALUES(?,?,?,?)', (platform, object_id, account, object_type))
@@ -241,8 +261,22 @@ class GatewayState:
         with self.connection() as db:
             row = db.execute('SELECT account,object_type FROM ownership WHERE platform=? AND object_id=?',
                              (platform, object_id)).fetchone()
-        if not row or row[0] != account or (object_type and row[1] != object_type):
+            shared = db.execute('SELECT object_type FROM asset_membership WHERE platform=? AND object_id=? AND account=?',
+                                (platform, object_id, account)).fetchall()
+        if any(object_type is None or r[0] == object_type for r in shared):
+            return
+        if not row or row[0] != account or (object_type and row[1] != object_type and not (row[1] == 'adobject' and object_type in ('campaign', 'adset', 'ad', 'creative'))):
             raise GatewayError('OBJECT_NOT_AUTHORIZED', 403, 'Object ownership is not verified for this account.')
+
+    def objects_for(self, platform, account, object_type):
+        with self.connection() as db:
+            return [row[0] for row in db.execute('SELECT object_id FROM asset_membership WHERE platform=? AND account=? AND object_type=? UNION SELECT object_id FROM ownership WHERE platform=? AND account=? AND object_type=?',
+                (platform, account, object_type, platform, account, object_type))]
+
+    def remove_asset(self, platform, account, object_id, object_type):
+        with self.connection() as db:
+            db.execute('DELETE FROM asset_membership WHERE platform=? AND account=? AND object_id=? AND object_type=?',
+                       (platform, account, object_id, object_type))
 
     @staticmethod
     def owner(principal: Principal, platform: str, account: str) -> str:
@@ -279,6 +313,15 @@ class GatewayState:
         with self.connection() as db:
             db.execute('UPDATE receipts SET state=?,result=?,updated_at=? WHERE owner=? AND idem=?',
                        ('complete', json.dumps(result, allow_nan=False), int(time.time()), owner, key))
+
+    def accounts_for(self, principal, platform):
+        self.check_principal(principal)
+        with self.connection() as db:
+            rows = db.execute('SELECT g.account FROM grants g JOIN credentials c ON c.ref=g.ref '
+                'WHERE g.subject=? AND g.client=? AND g.workspace=? AND g.platform=? AND c.active=1 '
+                'ORDER BY g.account', (principal.subject, principal.client_id, principal.workspace_id, platform)).fetchall()
+        # Return only configured grants, never all accounts available to a broad platform token.
+        return [row[0] for row in rows]
 
     def safe_status(self) -> list[dict]:
         with self.connection() as db:

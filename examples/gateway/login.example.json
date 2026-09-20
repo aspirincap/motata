@@ -1,0 +1,8 @@
+{
+  "issuer": "https://auth.example.com",
+  "gateway": "https://gateway.example.com:8443",
+  "client_id": "motata-cli",
+  "device_endpoint": "https://auth.example.com/oauth/device/code",
+  "token_endpoint": "https://auth.example.com/oauth/token",
+  "scope": "gateway:use meta:read meta:write tiktok:read tiktok:write"
+}

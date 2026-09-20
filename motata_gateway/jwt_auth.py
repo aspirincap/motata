@@ -54,7 +54,11 @@ class JWTVerifier:
             return
         if st.st_size > 65536:
             raise ValueError('JWKS too large')
-        data = json.loads(self.path.read_text())
+        from .responses import strict_json
+        data = strict_json(self.path.read_text())
+        self._keys, self._stamp = self.parse_keys(data), stamp
+
+    def parse_keys(self, data):
         items = data.get('keys') if isinstance(data, dict) else None
         if not isinstance(items, list) or not 1 <= len(items) <= 16:
             raise ValueError('Invalid JWKS')
@@ -76,12 +80,23 @@ class JWTVerifier:
             if self.algorithm == 'RS256' and key.key_size < 2048:
                 raise ValueError('RSA key must be at least 2048 bits')
             parsed[kid] = key
-        self._keys, self._stamp = parsed, stamp
+        return parsed
 
     def verify(self, token: str) -> Principal:
         try:
             if not isinstance(token, str) or not 1 <= len(token) <= 16384:
                 raise ValueError('Invalid token size')
+            # PyJWT checks the signature. Reject duplicate JSON claims/header names
+            # before handing it the token, rather than depending on parser winners.
+            from .responses import strict_json
+            import base64
+            parts = token.split('.')
+            if len(parts) != 3:
+                raise ValueError('Invalid token serialization')
+            for part in parts[:2]:
+                value = strict_json(base64.urlsafe_b64decode(part + '=' * (-len(part) % 4)))
+                if not isinstance(value, dict):
+                    raise ValueError('Invalid JOSE object')
             header = jwt.get_unverified_header(token)
             # Explicitly reject unknown key-discovery/critical/header extensions.
             if set(header) - {'typ', 'alg', 'kid'}:

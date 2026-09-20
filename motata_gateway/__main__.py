@@ -29,12 +29,20 @@ def main(argv=None):
         from .credentials import CredentialResolver
         from .service import GatewayService
         from .server import GatewayApp
-        from .limits import Limits
+        from .limits import Limits, RateBudget
         config = json.loads(private_bytes(args.config, 65536))
-        if set(config) - {'state_dir', 'issuer', 'audience', 'jwks_path', 'algorithm', 'meta_version', 'limits', 'auth_center_profiles'}:
+        if set(config) - {'state_dir', 'issuer', 'audience', 'jwks_path', 'algorithm', 'meta_version', 'limits', 'auth_center_profiles', 'jwks_url', 'jwks_cache_ttl', 'rates'}:
             raise ValueError('Unknown configuration field')
-        verifier = JWTVerifier(issuer=config['issuer'], audience=config['audience'],
-                               jwks_path=Path(config['jwks_path']), algorithm=config.get('algorithm', 'ES256'))
+        if bool(config.get('jwks_path')) == bool(config.get('jwks_url')):
+            raise ValueError('Configure exactly one of jwks_path or jwks_url')
+        if config.get('jwks_url'):
+            from .jwks import RemoteJWTVerifier
+            verifier = RemoteJWTVerifier(issuer=config['issuer'], audience=config['audience'],
+                jwks_url=config['jwks_url'], algorithm=config.get('algorithm', 'ES256'),
+                cache_ttl=config.get('jwks_cache_ttl', 300))
+        else:
+            verifier = JWTVerifier(issuer=config['issuer'], audience=config['audience'],
+                                   jwks_path=Path(config['jwks_path']), algorithm=config.get('algorithm', 'ES256'))
         state = GatewayState(Path(config['state_dir']))
         provider = None
         if 'auth_center_profiles' in config:
@@ -44,7 +52,8 @@ def main(argv=None):
             provider = AuthCenterProvider(load_profiles(profile_path))
         service = GatewayService(verifier=verifier, state=state, meta_version=config['meta_version'],
                                  limits=Limits(**config.get('limits', {})),
-                                 credentials=CredentialResolver(state, provider))
+                                 credentials=CredentialResolver(state, provider),
+                                 rates=RateBudget(**config.get('rates', {'global_rate': 20, 'account_rate': 5})))
         app = GatewayApp(service, allow_local_http=args.development_http)
         # One worker owns the global limits. Multiple workers would multiply quotas.
         uvicorn.run(app, host=args.host, port=args.port, workers=1, proxy_headers=False,

@@ -27,6 +27,12 @@ def resolve_auth(
         if access_token is not None and not isinstance(access_token, GatewayAuthRef):
             raise CliError("Direct access tokens are disabled in gateway mode.", exit_code=2)
         reference = access_token or auth_ref(media_code, account_id)
+        if account_id:
+            from dataclasses import replace
+            normalized = str(account_id).removeprefix('act_')
+            if reference.account_id and reference.account_id != normalized:
+                raise CliError("Gateway account authorization mismatch.", exit_code=2)
+            reference = replace(reference, account_id=normalized)
         if reference.platform != ("meta" if media_code in ("meta", "facebook") else media_code):
             raise CliError("Gateway platform authorization mismatch.", exit_code=2)
         return AuthContext(account_id=reference.account_id or "", media_code=media_code,

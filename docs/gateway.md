@@ -21,17 +21,19 @@ The gateway must run on a separate server or OS identity from the agent. Encrypt
 
 ## Implemented scope
 
-End-to-end offline integration tests exercise the **existing CLI** for:
+See [the current capability completion runbook](gateway-completion.md) for reviewed
+SDK/raw/BC/Smart+/GMV Max routes, nonempty full reports, server-only Page references,
+DNS-pinned media downloads, image/video/post migration and TikTok cover-copy flows.
+The [earlier reconstruction notes](gateway-rebuild.md) remain historical evidence.
+Server endpoint policy, account/object checks, JWT and no-secret-fallback remain mandatory.
 
-- Meta campaign list through JWT gateway;
-- TikTok campaign list through JWT gateway (raw HTTP path, no SDK token runtime);
-- Meta campaign creation with a caller-supplied stable idempotency key and PAUSED default.
+Before starting this version on existing state, run trusted offline admin `init`
+to add the non-destructive shared-asset membership schema. BC access needs explicit
+trusted asset bindings; broad platform-token visibility is not a caller grant.
 
-Reviewed gateway routes also include Meta account inspection, flat-projection campaign/adset/ad/creative/image/insight collections, verified numeric object reads, and TikTok campaign/adgroup/ad/integrated-report reads. Routes are intentionally narrower than the full CLI. Graph nested expansions/aliases, unknown payloads and unverified object IDs are rejected. Listing an account-rooted collection records ownership evidence for subsequent object reads.
-
-The `REVIEWED_HANDLERS` list is an **experimental migration gate**, not a new product goal restricting the complete CLI. Some handler options, including nested field expansions and Smart+, still fail the endpoint policy. A listed handler is not a claim that all its options passed compatibility validation.
-
-Remaining work is tracked in `gateway-implementation-status.md`. In particular: SDK transport, uploads/downloads, complete reporting/migration/copy flows, Auth Center provider/caching, issuer login/refresh, online JWKS refresh, cross-platform service hardening and platform rate budgets are not complete.
+These implementation tests do not claim live platform acceptance, an external
+issuer backend deployment, arbitrary future endpoints, every CLI parameter
+combination or OS/TLS production certification. See [implementation status](gateway-implementation-status.md).
 
 ## Server installation (trusted server only)
 
@@ -104,7 +106,7 @@ gateway:use meta:read meta:write tiktok:read
 
 Current account grants bind `(sub, client_id, workspace_id, platform, account_id)` to one credential reference. A supplied credential reference is not authorization.
 
-The current implementation uses a trusted local JWKS snapshot, automatically reloaded when the file is replaced. Publish old+new public keys, start signing with the new key, retain the old key for the maximum token lifetime plus clock tolerance, then remove it. Emergency `kid` revocation is available without waiting for normal rotation.
+The gateway supports either a trusted local JWKS snapshot (reloaded when replaced), or a fixed HTTPS `jwks_url` with bounded cache/cooldown. See gateway-rebuild.md; token-controlled key discovery remains forbidden. Publish old+new public keys, start signing with the new key, retain the old key for the maximum token lifetime plus clock tolerance, then remove it. Emergency `kid` revocation is available without waiting for normal rotation.
 
 ```bash
 motata-gateway-admin --state-dir /var/lib/motata-gateway revoke --kind sid --value session-a
@@ -127,7 +129,7 @@ export MOTATA_GATEWAY_META_ACCOUNT_ID=123
 export MOTATA_GATEWAY_TIKTOK_ACCOUNT_ID=789
 ```
 
-The JWT file must be a private regular file (0600 on POSIX) and contain a short-lived JWT issued outside this CLI. No refresh token or signing key is needed by the gateway. The transport reloads the JWT file before each request; an external issuer/login helper may replace it atomically. A `MOTATA_GATEWAY_JWT` environment value is also supported, but remains a copyable bearer capability. Built-in issuer login/refresh is not part of this increment.
+The JWT file must be a private regular file (0600 on POSIX) and contain a short-lived JWT issued outside this CLI. No refresh token or signing key is needed by the gateway. The transport reloads the JWT file before each request; an external issuer/login helper may replace it atomically. A `MOTATA_GATEWAY_JWT` environment value is also supported, but remains a copyable bearer capability. An external issuer-backed CLI device login/rotating-refresh client is now available; see gateway-rebuild.md. The issuer backend itself is not implemented by this CLI.
 
 ```bash
 motata meta campaigns list --account 123
@@ -159,7 +161,7 @@ Candidate per-instance limits:
 | request JSON | 1 MiB |
 | upstream JSON | 8 MiB |
 
-There is no separate unbounded admission queue. Excess requests receive `GATEWAY_BUSY`. An account waits for its slot before occupying a global slot. Idle account semaphores are removed. Grants are checked again after queue waiting. Upstream concurrency is **not** a platform requests-per-second budget. Production app/account/endpoint rate-limit feedback and distributed quotas are still pending.
+There is no separate unbounded admission queue. Excess requests receive `GATEWAY_BUSY`. An account waits for its slot before occupying a global slot. Idle account semaphores are removed. Grants are checked again after queue waiting. Upstream concurrency is **not** a platform requests-per-second budget. Configurable per-instance global/account token buckets are now available; production app/endpoint rate-limit feedback and distributed quotas are still pending.
 
 The 50-concurrency test uses a local mock upstream and validates bounded active calls, completion and cleanup. It is not a real-platform throughput measurement, a full-report capacity result, an RSS soak test or a production load certification.
 

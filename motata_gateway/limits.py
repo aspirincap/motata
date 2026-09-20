@@ -72,3 +72,68 @@ class Scheduler:
             row[1] -= 1
             if row[1] == 0:
                 self.accounts.pop(key, None)
+
+
+class RateBudget:
+    """Per-gateway and per-account token buckets, separately from concurrency.
+
+    Budgets are administrator values, not claims about platform quotas. Idle
+    buckets are pruned; pending waiters have a deadline and bounded state.
+    """
+    def __init__(self, global_rate=None, account_rate=None, *, burst=20, account_burst=5,
+                 wait_timeout=30, capacity=4096, clock=None, sleep=asyncio.sleep):
+        import time
+        import math
+        for rate in (global_rate, account_rate):
+            if rate is not None and (type(rate) not in (float, int) or not math.isfinite(rate) or not 0 < rate <= 10000):
+                raise ValueError('Invalid request-rate budget')
+        if (type(burst) is not int or type(account_burst) is not int or
+            not 1 <= burst <= 10000 or not 1 <= account_burst <= burst or
+            type(wait_timeout) not in (int, float) or not math.isfinite(wait_timeout) or
+            not 0 < wait_timeout <= 300 or type(capacity) is not int or not 2 <= capacity <= 65536):
+            raise ValueError('Invalid rate-bucket policy')
+        self.global_rate, self.account_rate = global_rate, account_rate
+        self.burst, self.account_burst, self.wait_timeout = burst, account_burst, wait_timeout
+        self.capacity = capacity
+        self.clock, self.sleep = clock or time.monotonic, sleep
+        self.buckets = {}
+        self.users = {}
+
+    async def wait(self, account):
+        rules = []
+        if self.global_rate:
+            rules.append((('global',), self.global_rate, self.burst))
+        if self.account_rate:
+            rules.append((('account', *account), self.account_rate, self.account_burst))
+        if not rules:
+            return
+        now = self.clock()
+        self.buckets = {k: v for k, v in self.buckets.items() if self.users.get(k) or now - v[1] < 300}
+        added = []
+        try:
+            for key, rate, burst in rules:
+                if key not in self.buckets:
+                    if len(self.buckets) >= self.capacity:
+                        raise GatewayError('GATEWAY_BUSY', 503, 'Rate-budget state capacity reached.')
+                    self.buckets[key] = [float(burst), now]
+                self.users[key] = self.users.get(key, 0) + 1
+                added.append(key)
+            deadline = now + self.wait_timeout
+            while True:
+                now = self.clock(); delay = 0
+                for key, rate, burst in rules:
+                    bucket = self.buckets[key]
+                    bucket[0] = min(burst, bucket[0] + max(0, now - bucket[1]) * rate)
+                    bucket[1] = now
+                    delay = max(delay, (1 - bucket[0]) / rate)
+                if delay <= 0:
+                    for key, _, _ in rules:
+                        self.buckets[key][0] -= 1
+                    return
+                if now + delay > deadline:
+                    raise GatewayError('RATE_WAIT_TIMEOUT', 503, 'Configured request-rate budget wait exceeded.', 'not_sent')
+                await self.sleep(max(delay, .001))
+        finally:
+            for key in added:
+                self.users[key] -= 1
+                if not self.users[key]: del self.users[key]

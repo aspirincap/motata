@@ -69,9 +69,7 @@ class MetaClient:
 
     def _request(self, method: str, url: str, **kwargs) -> dict[str, Any]:
         if self.gateway is not None:
-            if kwargs.get("files"):
-                raise CliError("GATEWAY_OPERATION_UNAVAILABLE: media transport is not migrated yet.")
-            if url.startswith("motata-page:"):
+            if url.startswith(("motata-page:", "motata-accounts:")):
                 path = url
             elif url.startswith(self.base + "/"):
                 path = url[len(self.base) + 1:]
@@ -79,7 +77,7 @@ class MetaClient:
                 raise CliError("Gateway pagination target is invalid.")
             envelope = self.gateway.request(auth=self.auth_ref, method=method.upper(), path=path,
                                             query=kwargs.get("params"), body=kwargs.get("data"),
-                                            body_encoding="form",
+                                            body_encoding="form", files=kwargs.get("files"),
                                             idempotency_key=os.getenv("MOTATA_GATEWAY_IDEMPOTENCY_KEY") if method != "get" else None)
             response = requests.Response()
             response.status_code = envelope["status"]
@@ -117,7 +115,51 @@ class MetaClient:
         response.raise_for_status()
         return payload
 
+    def list_page_credentials(self):
+        if self.gateway is None:
+            raise CliError('Page reference interface requires gateway mode.')
+        return self.gateway.page_credentials(self.auth_ref)
+
+    def get_with_page(self, page_ref, path, *, params=None):
+        from motata_cli.transport.gateway import GatewayPageRef
+        if self.gateway is None or not isinstance(page_ref,GatewayPageRef):
+            raise CliError('A typed gateway Page reference is required.')
+        try:
+            envelope=self.gateway.request(auth=GatewayAuthRef('meta',page_ref.account_id),
+                method='GET',path=path,query=params,page_credential_ref=page_ref.reference)
+        except CliError as exc:
+            if getattr(exc, 'gateway_code', None) != 'PAGE_AUTH_REQUIRED':
+                raise
+            # Refetch through the same authorized account, never request/export
+            # the underlying token. One bounded READ retry only.
+            pages=self.gateway.page_credentials(GatewayAuthRef('meta',page_ref.account_id))
+            fresh=next((p.get('page_credential_ref') for p in pages
+                        if str(p.get('id'))==page_ref.page_id and p.get('page_credential_ref')),None)
+            if not fresh: raise
+            envelope=self.gateway.request(auth=GatewayAuthRef('meta',page_ref.account_id),
+                method='GET',path=path,query=params,page_credential_ref=fresh)
+        response=requests.Response(); response.status_code=envelope['status']
+        response._content=json.dumps(envelope['data']).encode()
+        return self._handle(response)
+
+    def download(self, reference, destination):
+        if self.gateway is None:
+            from .services.media import download_file
+            return download_file(reference,destination)
+        return self.gateway.download(reference,destination)
+
     def get(self, path: str, *, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        if self.gateway is not None and not path and params and 'ids' in params:
+            ids=params['ids'].split(',') if isinstance(params['ids'],str) else params['ids']
+            if not isinstance(ids,list) or len(ids)>100 or any(not str(x).isdigit() for x in ids):
+                raise CliError('Invalid bounded object lookup.')
+            # Split Graph multi-ID into individually authorized reads; no root Graph batch tunnel.
+            result={}
+            for ident in ids:
+                try: result[str(ident)]=self.get(str(ident),params={k:v for k,v in params.items() if k!='ids'})
+                except Exception as exc:
+                    result[str(ident)]={'error':{'message':'Gateway object lookup failed','code':getattr(exc,'gateway_code','OBJECT_UNAVAILABLE')}}
+            return result
         final_params = dict(params or {}) if self.gateway is not None else {"access_token": self.access_token, **(params or {})}
         return self._request("get", self._url(path), params=final_params)
 

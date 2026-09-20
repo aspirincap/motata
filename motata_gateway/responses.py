@@ -37,6 +37,13 @@ def sanitize(value, known_secrets: tuple[str, ...], depth=0):
     if isinstance(value, list):
         return [sanitize(item, known_secrets, depth + 1) for item in value]
     if isinstance(value, str):
+        if value.lstrip().startswith(('{', '[')):
+            try:
+                parsed = strict_json(value)
+            except (ValueError, RecursionError):
+                pass
+            else:
+                return json.dumps(sanitize(parsed, known_secrets, depth + 1), ensure_ascii=False, allow_nan=False)
         variants = []
         for secret in known_secrets:
             if secret:
@@ -49,12 +56,6 @@ def sanitize(value, known_secrets: tuple[str, ...], depth=0):
         if any(v in value or v in decoded for v in variants):
             # Do not mutate arbitrary business string data and claim it is complete.
             raise GatewayError('RESPONSE_BLOCKED', 502, 'Platform response contained credential material.')
-        if value.lstrip().startswith(('{', '[')):
-            try:
-                parsed = strict_json(value)
-            except (ValueError, RecursionError):
-                return value
-            return json.dumps(sanitize(parsed, known_secrets, depth + 1), ensure_ascii=False, allow_nan=False)
         for candidate in re.findall(r'https?://[^\s<>"\']+', value):
             parts = urlsplit(candidate)
             if parts.username or parts.password or any(URL_KEYS.fullmatch(k) for k, _ in parse_qsl(parts.query)):
@@ -119,3 +120,91 @@ class PaginationStore:
             raise GatewayError('PAGINATION_EXPIRED', 404, 'Pagination reference is unavailable.')
         # A page can be read repeatedly, but every read is reauthorized with live grants.
         return row[2]
+
+
+def credential_values(value, depth=0) -> tuple[str, ...]:
+    """Collect NEW secrets returned by upstream before removing their fields.
+
+    A derived secret can also be echoed in a business string. Only scanning the
+    credential used for the request would miss that second copy.
+    """
+    if depth > 32:
+        raise GatewayError('RESPONSE_BLOCKED', 502, 'Response nesting exceeded safety limit.')
+    values = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if SECRET_FIELD.fullmatch(str(key)) and isinstance(item, str) and item:
+                values.append(item)
+            else:
+                values.extend(credential_values(item, depth + 1))
+    elif isinstance(value, list):
+        for item in value:
+            values.extend(credential_values(item, depth + 1))
+    elif isinstance(value, str) and value.lstrip().startswith(('{', '[')):
+        try:
+            parsed = strict_json(value)
+        except (ValueError, RecursionError):
+            return ()
+        values.extend(credential_values(parsed, depth + 1))
+    return tuple(set(values))
+
+
+def write_evidence(request, endpoint, payload):
+    """Return (confirmed, bindings) only for explicit reviewed success contracts.
+
+    HTTP 2xx alone is NOT evidence. A Meta partial video phase is complete only
+    for that phase, not the entire upload. No evidence -> uncertain receipt.
+    """
+    bindings = []
+    typ = endpoint.object_type
+    def numeric(value):
+        return re.fullmatch(r'[0-9]{1,64}', str(value or '')) is not None
+    if request.platform == 'meta':
+        if endpoint.confirmation == 'meta_success':
+            return payload.get('success') is True, bindings
+        if endpoint.confirmation == 'report':
+            ident = payload.get('report_run_id')
+            if numeric(ident):
+                return True, [('report', str(ident))]
+            return False, bindings
+        if endpoint.confirmation == 'upload':
+            phase = (request.body or {}).get('upload_phase')
+            if phase == 'start':
+                ok = numeric(payload.get('upload_session_id')) and numeric(payload.get('video_id'))
+                if ok:
+                    return True, [('upload_session', str(payload['upload_session_id'])), ('video', str(payload['video_id']))]
+                return False, []
+            if phase == 'transfer':
+                start, end = str(payload.get('start_offset', '')), str(payload.get('end_offset', ''))
+                return start.isdigit() and end.isdigit() and int(start) <= int(end), []
+            if phase == 'finish':
+                return payload.get('success') is True, []
+            if typ == 'image':
+                images = payload.get('images')
+                return bool(isinstance(images, dict) and images and
+                            all(isinstance(x, dict) and isinstance(x.get('hash'), str) and x['hash']
+                                for x in images.values())), []
+        if numeric(payload.get('id')):
+            return True, [(typ, str(payload['id']))] if typ else []
+        return False, []
+    if payload.get('code') not in (0, '0'):
+        return False, []
+    if endpoint.confirmation == 'tiktok_code':
+        return True, []
+    if endpoint.confirmation == 'tiktok_link':
+        data=payload.get('data') or {}
+        return isinstance(data,dict) and any(isinstance(data.get(k),str) and data[k] for k in ('shareable_link','preview_url','url','shareable_url')), []
+    data = payload.get('data')
+    candidates = data if isinstance(data, list) else [data]
+    key = {'portfolio':'creative_portfolio_id'}.get(typ, (typ or '') + '_id')
+    for item in candidates:
+        if not isinstance(item, dict):
+            continue
+        # Different platform upload/create responses have singular or plural IDs.
+        identities = [item.get(key),item.get('smart_plus_'+key),item.get('avatar_video_id') if typ=='video' else None]
+        for plural in (key + 's', 'smart_plus_' + key + 's'):
+            if isinstance(item.get(plural), list):
+                identities += item[plural]
+        from .resource_evidence import identifier
+        bindings += [(typ, str(x)) for x in identities if identifier(x)]
+    return bool(bindings), bindings
