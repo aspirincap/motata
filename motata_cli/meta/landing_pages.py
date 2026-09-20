@@ -394,6 +394,12 @@ def _get_story_payload_with_token(
     page_access_token: str | None = None,
 ) -> tuple[dict[str, Any], str | None]:
     params = {"fields": DEFAULT_STORY_FIELDS}
+    from motata_cli.transport.gateway import GatewayPageRef
+    if isinstance(page_access_token, GatewayPageRef):
+        try:
+            return meta.get_with_page(page_access_token,story_id,params=params),None
+        except Exception as exc:
+            return {},str(exc)
     if page_access_token:
         params["access_token"] = page_access_token
     try:
@@ -530,6 +536,15 @@ def discover_recent_spend_accounts(
 
 
 def _list_page_access_tokens(meta: Any) -> tuple[dict[str, str], dict[str, str], str | None]:
+    if getattr(meta, 'gateway', None) is not None:
+        from motata_cli.transport.gateway import GatewayPageRef
+        try:
+            pages=meta.list_page_credentials()
+            refs={str(p['id']):GatewayPageRef(p['page_credential_ref'],p['account_id'],str(p['id']))
+                  for p in pages if p.get('page_credential_ref')}
+            return refs,{str(p['id']):str(p.get('name') or '') for p in pages},None
+        except Exception as exc:
+            return {},{},str(exc)
     try:
         pages = meta.paginate(
             "me/accounts",

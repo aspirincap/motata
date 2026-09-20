@@ -18,7 +18,11 @@
     "!motata_cli/**/*.pyo",
     "pyproject.toml",
     "setup.cfg",
-    "README.md"
+    "README.md",
+    "motata_gateway",
+    "!motata_gateway/**/__pycache__",
+    "!motata_gateway/**/*.pyc",
+    "!motata_gateway/**/*.pyo"
   ],
   "scripts": {
     "postinstall": "node scripts/npm-postinstall.js",

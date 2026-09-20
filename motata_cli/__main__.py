@@ -32,15 +32,25 @@ def build_parser() -> argparse.ArgumentParser:
     register_metrics_commands(subparsers)
     register_report_commands(subparsers)
     register_update_command(subparsers)
+    from motata_cli.transport.login import register_gateway_commands
+    register_gateway_commands(subparsers)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
+    from motata_cli.transport.gateway import gateway_enabled, check_agent_environment, guard_command
+    try:
+        if gateway_enabled():
+            check_agent_environment()
+    except CliError as exc:
+        print(json.dumps({"error": str(exc), "exit_code": 2}), file=sys.stderr)
+        return 2
     parser = build_parser()
     args = parser.parse_args(argv)
     configure_output(getattr(args, "output", None))
     configure_meta_debug(getattr(args, "debug", False))
     try:
+        guard_command(args)
         if getattr(args, "requires_live_probe", False) and not getattr(args, "allow_live_probe", False):
             raise CliError(
                 "This validation creates real platform objects. Review the side effects, "

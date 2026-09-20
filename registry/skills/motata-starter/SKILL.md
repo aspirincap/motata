@@ -4,6 +4,23 @@ description: |
   End-to-end Meta and TikTok advertising orchestrator built on motata. Use when the user wants a full ads workflow that combines strategy research, delivery execution, and post-campaign review, or when they ask for "广告全流程", "广告策略与交付总编排", "launch campaign from scratch", "plan then execute ads", "review and optimize campaigns", or "run Meta/TikTok ads end to end". Also use when the user asks to turn a product URL or product page into a cross-channel launch plan, such as "根据这个产品设计一个跨渠道投放方案，日预算1000刀", "给我一个产品页的投放策略", or similar budgeted channel-planning requests. Prefer the first-class `motata product intake` path whenever a URL exists. This skill routes work across three phases: strategy research, delivery execution, and review. It uses `motata ad ops` for operational execution and reuses `motata token` for token retrieval. It does not do creative production.
 ---
 
+## Gateway mode takes precedence
+
+When `MOTATA_AUTH_MODE=gateway`, do not run `motata-token`, fetch platform tokens
+with curl, paste secrets, use `--access-token`, or read Auth Center API keys. All
+token-fetch examples below and in referenced files apply only to explicitly
+trusted human/admin **direct mode**, never to a Gateway agent. The Gateway holds
+Meta/TikTok credentials; the CLI uses only its own limited Gateway JWT/session.
+
+For `AUTH_REQUIRED`, use a preconfigured external issuer login (`motata gateway
+--config <private-config> --session <private-session> login`) or ask the trusted
+administrator to restore access. Never downgrade to direct mode. Gateway `init`
+is not yet implemented; do not route Gateway onboarding through the legacy
+interactive token flow. Unsupported endpoints fail closed and remain migration
+work, not permission to fetch credentials. Keep write approvals and existing
+migration `needs_review` rules; read partial report manifests before continuing.
+
+
 # Motata Starter
 
 Use this skill as the top-level controller for ads work. It decides which phase the task belongs to, gathers the minimum required inputs, and routes operational work to `motata ad ops`.

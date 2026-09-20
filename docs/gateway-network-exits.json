@@ -1,0 +1,486 @@
+{
+  "schema_version": 1,
+  "baseline": "55f8fd452063001b2b608ca9e1e664fed3269b32",
+  "entries": [
+    {
+      "file": "motata_cli/_vendor/tiktok_business_api_sdk/python_sdk/business_api_client/api_client.py",
+      "line": 1,
+      "function": "ApiClient.request",
+      "call": "vendored_sdk_transport",
+      "classification": "platform_authenticated",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/auth_center/fetch_token.py",
+      "line": 122,
+      "function": "request_payload",
+      "call": "urllib.request.urlopen",
+      "classification": "credential_admin",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/meta/app_discovery.py",
+      "line": 216,
+      "function": "_resolve_store_redirect",
+      "call": "requests.get",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/meta/client.py",
+      "line": 82,
+      "function": "_request",
+      "call": "requests.Response",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/meta/client.py",
+      "line": 89,
+      "function": "_request",
+      "call": "getattr(requests, method)",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/meta/client.py",
+      "line": 141,
+      "function": "get_with_page",
+      "call": "requests.Response",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/meta/user_type.py",
+      "line": 224,
+      "function": "_scrape_generic_landing_page",
+      "call": "requests.get",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/product/intake.py",
+      "line": 137,
+      "function": "fetch_html",
+      "call": "requests.get",
+      "classification": "public_no_platform_credential",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/product/scraper.py",
+      "line": 69,
+      "function": "lookup_appstore_metadata",
+      "call": "requests.get",
+      "classification": "public_no_platform_credential",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/product/scraper.py",
+      "line": 156,
+      "function": "resolve_store_redirect",
+      "call": "requests.get",
+      "classification": "public_no_platform_credential",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/product/scraper.py",
+      "line": 189,
+      "function": "scrape_appstore",
+      "call": "requests.get",
+      "classification": "public_no_platform_credential",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/product/scraper.py",
+      "line": 272,
+      "function": "scrape_googleplay",
+      "call": "requests.get",
+      "classification": "public_no_platform_credential",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/product/scraper.py",
+      "line": 611,
+      "function": "scrape_ecommerce",
+      "call": "requests.get",
+      "classification": "public_no_platform_credential",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/report/html_utils.py",
+      "line": 113,
+      "function": "cache_remote_images",
+      "call": "urllib.request.urlopen",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 107,
+      "function": "_list_entities",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 159,
+      "function": "_raw_request",
+      "call": "requests.request",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 307,
+      "function": "get_gmv_max_campaign",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 334,
+      "function": "create_campaign",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 338,
+      "function": "update_campaign",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 346,
+      "function": "update_campaign_status",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 389,
+      "function": "create_adgroup",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 393,
+      "function": "update_adgroup",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 401,
+      "function": "update_adgroup_status",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 445,
+      "function": "create_ad",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 449,
+      "function": "update_ad",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 453,
+      "function": "update_ad_status",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 521,
+      "function": "upload_image",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 577,
+      "function": "upload_video",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 633,
+      "function": "delete_assets",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 636,
+      "function": "share_assets",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 639,
+      "function": "get_account_info",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 649,
+      "function": "oauth2_advertiser_get",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 652,
+      "function": "update_account",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 655,
+      "function": "list_pixels",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 664,
+      "function": "list_offline_event_sets",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 682,
+      "function": "list_apps",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 690,
+      "function": "get_app_info",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 723,
+      "function": "list_pages",
+      "call": "requests.get",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 909,
+      "function": "list_app_optimization_events",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 935,
+      "function": "list_catalogs",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 949,
+      "function": "get_catalog_eventsource_bindings",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 957,
+      "function": "list_stores",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 1003,
+      "function": "gmv_max_report",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 1069,
+      "function": "search_regions",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 1077,
+      "function": "targeting_search",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 1080,
+      "function": "targeting_info",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 1083,
+      "function": "targeting_list",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 1092,
+      "function": "validate_url",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 1112,
+      "function": "get_vbo_status",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 1200,
+      "function": "smart_plus_material_report_overview",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 1234,
+      "function": "smart_plus_material_report_breakdown",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 1262,
+      "function": "list_identities",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 1277,
+      "function": "create_identity",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 1313,
+      "function": "list_creative_portfolios",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 1327,
+      "function": "get_creative_portfolio",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 1335,
+      "function": "create_creative_portfolio",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 1338,
+      "function": "create_shareable_link",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/tiktok/client.py",
+      "line": 1341,
+      "function": "generate_smart_text",
+      "call": "self._invoke",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/transport/gateway.py",
+      "line": 66,
+      "function": "__init__",
+      "call": "requests.Session",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    },
+    {
+      "file": "motata_cli/transport/login.py",
+      "line": 179,
+      "function": "__init__",
+      "call": "requests.Session",
+      "classification": "requires_review",
+      "coverage": "not_migrated"
+    }
+  ]
+}

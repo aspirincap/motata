@@ -84,6 +84,12 @@ def local_media_extension_from_url(url: str | None, default: str = ".jpg") -> st
 
 
 def download_file(url: str, dest: Path, *, get: Callable | None = None) -> None:
+    from motata_cli.transport.gateway import gateway_enabled, RemoteGatewayTransport
+    if gateway_enabled():
+        transport=RemoteGatewayTransport.from_environment()
+        try: transport.download(url,dest)
+        finally: transport.close()
+        return
     with (get or requests.get)(url, stream=True, timeout=300) as response:
         response.raise_for_status()
         with dest.open("wb") as handle:
@@ -171,6 +177,8 @@ def upload_image(meta: MetaClient, account_id: str, file_path: str, name: str | 
 
 
 def build_video_client(meta: MetaClient) -> MetaClient:
+    if getattr(meta, 'gateway', None) is not None:
+        return meta  # Gateway policy selects the fixed video origin; preserve account ref.
     return MetaClient(meta.access_token, version=META_VERSION, base_url=META_VIDEO_BASE_URL, error_factory=meta.error_factory)
 
 
@@ -204,15 +212,15 @@ def single_upload_video(
     name: str | None,
     title: str | None,
 ) -> dict[str, Any]:
-    file_bytes = file_path.read_bytes()
     mime = mimetypes.guess_type(file_path.name)[0] or "video/mp4"
-    payload = video_post_with_retry(
-        video_meta,
-        f"{ad_account_path(account_id)}/advideos",
-        data=filter_empty({"name": name or file_path.name, "title": title}),
-        files={"source": (file_path.name, file_bytes, mime)},
-        context=f"Single video upload for {file_path.name}",
-    )
+    with file_path.open("rb") as source:
+        payload = video_post_with_retry(
+            video_meta,
+            f"{ad_account_path(account_id)}/advideos",
+            data=filter_empty({"name": name or file_path.name, "title": title}),
+            files={"source": (file_path.name, source, mime)},
+            context=f"Single video upload for {file_path.name}",
+        )
     return {"id": payload.get("id") or payload.get("video_id"), "type": "video", **payload, "raw": payload}
 
 

@@ -1,0 +1,476 @@
+{
+  "schema_version": 1,
+  "scope": "SDK/raw builders reachable from the current TikTokClient; not all hypothetical APIs",
+  "evidence": "Source policy checks plus gateway_tests/test_completion_tiktok.py and workflow tests",
+  "sdk": [
+    {
+      "builder": "ad_create",
+      "method": "POST",
+      "path": "ad/create/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "ad_image_upload",
+      "method": "POST",
+      "path": "file/image/ad/upload/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "ad_status_update",
+      "method": "POST",
+      "path": "ad/status/update/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "ad_update",
+      "method": "POST",
+      "path": "ad/update/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "ad_video_search",
+      "method": "GET",
+      "path": "file/video/ad/search/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "ad_video_upload",
+      "method": "POST",
+      "path": "file/video/ad/upload/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "adgroup_create",
+      "method": "POST",
+      "path": "adgroup/create/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "adgroup_status_update",
+      "method": "POST",
+      "path": "adgroup/status/update/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "adgroup_update",
+      "method": "POST",
+      "path": "adgroup/update/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "advertiser_info",
+      "method": "GET",
+      "path": "advertiser/info/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "advertiser_update",
+      "method": "POST",
+      "path": "advertiser/update/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "app_info",
+      "method": "GET",
+      "path": "app/info/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "app_list",
+      "method": "GET",
+      "path": "app/list/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "app_optimization_event",
+      "method": "GET",
+      "path": "app/optimization_event/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "campaign_create",
+      "method": "POST",
+      "path": "campaign/create/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "campaign_gmv_max_info",
+      "method": "GET",
+      "path": "campaign/gmv_max/info/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "campaign_status_update",
+      "method": "POST",
+      "path": "campaign/status/update/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "campaign_update",
+      "method": "POST",
+      "path": "campaign/update/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "catalog_eventsource_bind_get",
+      "method": "GET",
+      "path": "catalog/eventsource_bind/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "catalog_get",
+      "method": "GET",
+      "path": "catalog/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "creative_asset_delete",
+      "method": "POST",
+      "path": "creative/asset/delete/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "creative_asset_share",
+      "method": "POST",
+      "path": "creative/asset/share/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "creative_portfolio_create",
+      "method": "POST",
+      "path": "creative/portfolio/create/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "creative_portfolio_get",
+      "method": "GET",
+      "path": "creative/portfolio/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "creative_portfolio_list",
+      "method": "GET",
+      "path": "creative/portfolio/list/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "creative_shareable_link_create",
+      "method": "POST",
+      "path": "creative/shareable_link/create/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "creative_smart_text_generate",
+      "method": "POST",
+      "path": "creative/smart_text/generate/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "gmv_max_report_get",
+      "method": "GET",
+      "path": "gmv_max/report/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "gmv_max_store_list",
+      "method": "GET",
+      "path": "gmv_max/store/list/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "identity_create",
+      "method": "POST",
+      "path": "identity/create/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "identity_get",
+      "method": "GET",
+      "path": "identity/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "oauth2_advertiser_get",
+      "method": "GET",
+      "path": "oauth2/advertiser/get/",
+      "status": "replaced_by_authorized_account_discovery"
+    },
+    {
+      "builder": "offline_get",
+      "method": "GET",
+      "path": "offline/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "pixel_list",
+      "method": "GET",
+      "path": "pixel/list/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "search_region",
+      "method": "GET",
+      "path": "search/region/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "smart_plus_ad_create",
+      "method": "POST",
+      "path": "smart_plus/ad/create/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "smart_plus_ad_status_update",
+      "method": "POST",
+      "path": "smart_plus/ad/status/update/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "smart_plus_ad_update",
+      "method": "POST",
+      "path": "smart_plus/ad/update/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "smart_plus_adgroup_create",
+      "method": "POST",
+      "path": "smart_plus/adgroup/create/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "smart_plus_adgroup_status_update",
+      "method": "POST",
+      "path": "smart_plus/adgroup/status/update/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "smart_plus_adgroup_update",
+      "method": "POST",
+      "path": "smart_plus/adgroup/update/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "smart_plus_campaign_create",
+      "method": "POST",
+      "path": "smart_plus/campaign/create/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "smart_plus_campaign_status_update",
+      "method": "POST",
+      "path": "smart_plus/campaign/status/update/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "smart_plus_campaign_update",
+      "method": "POST",
+      "path": "smart_plus/campaign/update/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "smart_plus_material_report_breakdown",
+      "method": "GET",
+      "path": "smart_plus/material_report/breakdown/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "smart_plus_material_report_overview",
+      "method": "GET",
+      "path": "smart_plus/material_report/overview/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "tool_targeting_info",
+      "method": "POST",
+      "path": "tool/targeting/info/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "tool_targeting_list",
+      "method": "GET",
+      "path": "tool/targeting/list/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "tool_targeting_search",
+      "method": "POST",
+      "path": "tool/targeting/search/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "tool_url_validate",
+      "method": "GET",
+      "path": "tool/url_validate/",
+      "status": "reviewed_route"
+    },
+    {
+      "builder": "tool_vbo_status",
+      "method": "GET",
+      "path": "tool/vbo_status/",
+      "status": "reviewed_route"
+    }
+  ],
+  "raw": [
+    {
+      "method": "GET",
+      "path": "ad/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "adgroup/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "bc/asset/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "bc/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "campaign/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "changelog/task/check/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "changelog/task/download/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "creative/aigc/video/list/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "creative/aigc/video/task/list/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "creative/aigc/voice/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "creative/digital_avatar/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "creative/digital_avatar/video/list/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "creative/digital_avatar/video/task/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "file/image/ad/info/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "file/video/ad/info/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "gmv_max/campaign/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "gmv_max/video/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "identity/video/info/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "page/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "report/integrated/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "smart_plus/ad/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "smart_plus/adgroup/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "smart_plus/campaign/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "store/product/get/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "GET",
+      "path": "tt_video/list/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "POST",
+      "path": "changelog/task/create/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "POST",
+      "path": "creative/aigc/image_animation/task/create/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "POST",
+      "path": "creative/aigc/video/task/create/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "POST",
+      "path": "creative/digital_avatar/video/task/create/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "POST",
+      "path": "file/image/ad/upload/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "POST",
+      "path": "file/video/ad/update/",
+      "status": "reviewed_route"
+    },
+    {
+      "method": "POST",
+      "path": "gmv_max/creation/custom_anchor_video_list/get/",
+      "status": "reviewed_route"
+    }
+  ],
+  "unresolved": []
+}

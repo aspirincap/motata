@@ -1,0 +1,75 @@
+name: JWT gateway verification
+on:
+  push:
+    branches: ['feat/jwt-gateway-token-isolation']
+  pull_request:
+    paths:
+      - 'motata_gateway/**'
+      - 'motata_cli/**'
+      - 'tests/**'
+      - 'gateway_tests/**'
+      - 'scripts/**'
+      - 'pyproject.toml'
+      - 'requirements-gateway*.txt'
+      - '.github/workflows/gateway-verification.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: gateway-verification-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Provision existing dependencies
+        run: |
+          python -m pip install -r requirements-release.txt
+          if [ -f requirements-gateway-dev.txt ]; then
+            python -m pip install -r requirements-gateway-dev.txt
+          fi
+      - name: Record environment and archive tracked source
+        run: |
+          mkdir -p /tmp/gateway-audit
+          { git rev-parse HEAD; python --version; node --version; uname -s; } > /tmp/gateway-audit/environment.txt
+          git archive --format=tar.gz --output=/tmp/gateway-audit/source.tar.gz HEAD
+      - name: Existing offline Python regression
+        env:
+          MOTATA_SUPPRESS_SKILLS_NOTICE: '1'
+        run: |
+          set -o pipefail
+          python scripts/run_offline_tests.py 2>&1 | tee /tmp/gateway-audit/python-tests.log
+      - name: Existing Node regression
+        if: always()
+        run: |
+          set -o pipefail
+          node --test tests/runtime.test.js tests/runtime-lock.test.js 2>&1 | tee /tmp/gateway-audit/node-tests.log
+      - name: Gateway regression and inventories
+        if: always()
+        env:
+          MOTATA_SUPPRESS_SKILLS_NOTICE: '1'
+        run: |
+          set -o pipefail
+          if [ -f scripts/check_gateway.py ]; then
+            python scripts/check_gateway.py 2>&1 | tee /tmp/gateway-audit/gateway-tests.log
+            cp docs/gateway-command-matrix.json docs/gateway-network-exits.json /tmp/gateway-audit/
+            python scripts/check_release.py --pack-only > /tmp/gateway-audit/gateway-pack.log 2>&1
+          fi
+      - name: Upload source and non-secret test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gateway-audit
+          path: /tmp/gateway-audit
+          retention-days: 7
+          if-no-files-found: error

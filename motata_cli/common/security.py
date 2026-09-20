@@ -33,7 +33,7 @@ def redact(value: Any, secrets: tuple[str, ...] = ()) -> Any:
             return json.dumps(redact(parsed, secrets), ensure_ascii=False)
     # Decode URL escapes as diagnostics need not preserve a request's wire format.
     text = unquote(value)
-    for secret in sorted((s for s in secrets if s), key=len, reverse=True):
+    for secret in sorted((s for s in secrets if isinstance(s, str) and s), key=len, reverse=True):
         for variant in (secret, quote(secret, safe=""), quote_plus(secret)):
             text = text.replace(variant, REDACTED)
     text = re.sub(r"(?i)\b(Bearer|Basic)\s+[^\s\"',;}]+", r"\1 " + REDACTED, text)

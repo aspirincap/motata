@@ -3,6 +3,23 @@ name: motata-report
 description: Motata reporting layer for HTML-first outputs with UDA-style validation inside the Motata skill set. Use when the user asks for Daily Pulse, Weekly Report, HTML reports, account performance recaps, client/team review reports, vertical reports, Meta/TikTok platform summaries, creative fatigue tables, high-spend low-conversion watchlists, landing-page or W2A path tables, audience optimization sections, or when they want to generate, regenerate, fix, audit, or compare reports from Motata JSON/CSV/Excel exports. This skill coordinates Motata data pulls with dataset validation, structured analysis artifacts, post-generation audit, and HTML-first output.
 ---
 
+## Gateway mode takes precedence
+
+When `MOTATA_AUTH_MODE=gateway`, do not run `motata-token`, fetch platform tokens
+with curl, paste secrets, use `--access-token`, or read Auth Center API keys. All
+token-fetch examples below and in referenced files apply only to explicitly
+trusted human/admin **direct mode**, never to a Gateway agent. The Gateway holds
+Meta/TikTok credentials; the CLI uses only its own limited Gateway JWT/session.
+
+For `AUTH_REQUIRED`, use a preconfigured external issuer login (`motata gateway
+--config <private-config> --session <private-session> login`) or ask the trusted
+administrator to restore access. Never downgrade to direct mode. Gateway `init`
+is not yet implemented; do not route Gateway onboarding through the legacy
+interactive token flow. Unsupported endpoints fail closed and remain migration
+work, not permission to fetch credentials. Keep write approvals and existing
+migration `needs_review` rules; read partial report manifests before continuing.
+
+
 # Motata Report
 
 ## Role

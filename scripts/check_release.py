@@ -57,7 +57,7 @@ def stage_source(target: Path) -> None:
             dst = target / name
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(src, dst)
-    for directory, suffixes in (('motata_cli', {'.py', '.json'}), ('bin', {'.js'}), ('lib', {'.js'})):
+    for directory, suffixes in (('motata_cli', {'.py', '.json'}), ('motata_gateway', {'.py', '.json'}), ('bin', {'.js'}), ('lib', {'.js'})):
         for src in (ROOT / directory).rglob('*'):
             if src.is_symlink() or any(p in FORBIDDEN for p in src.relative_to(ROOT).parts):
                 continue
@@ -95,7 +95,7 @@ def main() -> None:
             entries = archive_entries(artifact)
             audit(entries)
             prefix = '' if artifact.suffix == '.whl' else ('package/' if artifact.suffix == '.tgz' else f'motata_cli-{version}/')
-            for src in (source / 'motata_cli').rglob('*'):
+            for src in (p for name in ('motata_cli', 'motata_gateway') for p in (source / name).rglob('*')):
                 if src.is_file() and (src.suffix in {'.py', '.json'} or src.name in {'LICENSE', 'NOTICE.md'}):
                     name = prefix + src.relative_to(source).as_posix()
                     assert entries.get(name) == src.read_bytes(), (artifact, name)

@@ -103,7 +103,7 @@ def execute_tiktok_campaign_copy(client: TikTokClient, *, advertiser_id: str, ca
                                     ad_data = ad_result.get('data', {})
                                     ad_id = ad_data.get('smart_plus_ad_id') or ad_data.get('ad_id')
                                     if not ad_id:
-                                        ad_ids = ad_data.get('ad_ids')
+                                        ad_ids = ad_data.get('ad_ids') or ad_data.get('smart_plus_ad_ids')
                                         if isinstance(ad_ids, list) and ad_ids:
                                             ad_id = ad_ids[0]
                                     if ad_id:
