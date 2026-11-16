@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from motata_cli.common.output import error_kind, pagination, request_with_retry
+from motata_cli.common.output import pagination
 from motata_cli.common.output import completeness, finalize, unsupported_metrics
 from motata_cli.common.security import redact
 
 import argparse
 import json
+import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -452,7 +453,7 @@ def _pull_basic_report(
         rows: list[dict[str, Any]] = []
         try:
             for page in range(1, (max_pages or 1) + 1):
-                response = request_with_retry(client.integrated_report,
+                response = client.integrated_report(
                     "BASIC",
                     advertiser_id=advertiser_id,
                     data_level=str(spec["data_level"]),
@@ -708,8 +709,18 @@ def _prepare_tiktok_report_args(args: argparse.Namespace) -> argparse.Namespace:
     args.advertiser_ids = advertiser_ids
     args.account_source = account_source
 
+    if any(getattr(args, key, None) for key in ("token_source", "auth_center_base_url", "auth_center_header", "auth_center_agent_id")) and not getattr(args, "dry_run", False):
+        from motata_cli.auth_center.provider import resolve_tiktok_credential, options_from_args
+        args.access_token, args.access_token_source = resolve_tiktok_credential(
+            account_id=args.advertiser_id, access_token=getattr(args, "access_token", None), **options_from_args(args))
+
     if not getattr(args, "access_token", None):
-        access_token, token_source = resolve_default_access_token("tiktok")
+        if getattr(args, "dry_run", False):
+            auth_center_selected = (getattr(args, "token_source", None) or profile.get("token_source")) == "auth-center"
+            access_token = None if auth_center_selected else (os.getenv("TIKTOK_ACCESS_TOKEN") or os.getenv("MOTATA_TIKTOK_ACCESS_TOKEN"))
+            token_source = "environment" if access_token else None
+        else:
+            access_token, token_source = resolve_default_access_token("tiktok")
         if not access_token and getattr(args, "dry_run", False):
             args.access_token = None
             args.access_token_source = "not_required_dry_run"
@@ -722,7 +733,7 @@ def _prepare_tiktok_report_args(args: argparse.Namespace) -> argparse.Namespace:
             args.access_token = access_token
             args.access_token_source = token_source
     else:
-        args.access_token_source = "cli"
+        args.access_token_source = getattr(args, "access_token_source", "cli")
 
     analysis_metrics = resolve_init_metrics("tiktok")
     args.analysis_metrics = analysis_metrics
@@ -853,41 +864,26 @@ class TikTokReportRunner:
         self.manifest["sources"].append(item)
 
     def run_source(self, name: str, fn: Callable[[], Any]) -> Any:
+        # The HTTP transport owns the retry budget for each read. Replaying a
+        # source would repeat successful pages and potentially task creation.
         path = self.run_dir / f"{name}.json"
-        attempts = max(1, int(self.args.retry or 1))
-        last_error = ""
         source_started_at = time.monotonic()
-        for attempt in range(1, attempts + 1):
-            try:
-                payload = fn()
-                _write_json(path, payload)
-                self.record(
-                    name,
-                    completeness(payload)["status"],
-                    str(path),
-                    completeness=completeness(payload),
-                    attempts=attempt,
-                    rows=_row_count(payload),
-                    duration_sec=round(time.monotonic() - source_started_at, 3),
-                )
-                return payload
-            except Exception as exc:
-                last_error = redact(str(exc), (getattr(self.args, 'access_token', ''),))
-                if error_kind(exc) not in {"network", "rate_limit"}:
-                    break
-                if attempt < attempts:
-                    time.sleep(max(0.0, float(self.args.retry_wait or 0.0)))
-        error_payload = {"error": last_error, "source": name, "status": "failed"}
-        _write_json(path, error_payload)
-        self.record(
-            name,
-            "failed",
-            str(path),
-            error=last_error,
-            attempts=attempt,
-            duration_sec=round(time.monotonic() - source_started_at, 3),
-        )
-        return error_payload
+        try:
+            payload = fn()
+            _write_json(path, payload)
+            self.record(name, completeness(payload)["status"], str(path),
+                        completeness=completeness(payload), attempts=1, rows=_row_count(payload),
+                        duration_sec=round(time.monotonic() - source_started_at, 3))
+            return payload
+        except Exception as exc:
+            last_error = redact(str(exc), (getattr(self.args, 'access_token', ''),))
+            error_payload = {"error": last_error, "source": name, "status": "failed"}
+            _write_json(path, error_payload)
+            self.record(name, "failed", str(path), error=last_error, attempts=1,
+                        http_attempts=getattr(exc, 'attempts', None),
+                        retry_stop_reason=getattr(exc, 'retry_stop_reason', None),
+                        duration_sec=round(time.monotonic() - source_started_at, 3))
+            return error_payload
 
     def run(self) -> dict[str, Any]:
         from motata_cli.tiktok.commands import resolve_tiktok_client

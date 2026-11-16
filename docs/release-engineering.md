@@ -1,5 +1,58 @@
 # Offline release verification
 
+## OIDC npm releases
+
+The public package is `motata`; its repository metadata must match
+`git+https://github.com/aspirincap/motata.git`. Publication runs only in the
+GitHub-hosted `npm-publish.yml` workflow, using a matching `v<version>` tag whose
+commit is contained in `main`. It does not consume `NPM_TOKEN`, `NODE_AUTH_TOKEN`
+or a developer's `.npmrc`.
+
+Configure the existing npm package's Trusted Publisher once:
+
+| Setting | Value |
+| --- | --- |
+| Provider | GitHub Actions |
+| Organization or user | `aspirincap` |
+| Repository | `motata` |
+| Workflow filename | `npm-publish.yml` |
+| Environment name | Leave empty (the workflow does not use an environment) |
+| Allowed actions | Enable direct `npm publish` |
+
+New publisher configurations default to staged publishing; direct publish must
+be explicitly enabled. This account-level setup requires an authenticated npm
+maintainer with 2FA. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
+Do not replace OIDC with a token if configuration is missing.
+
+The tag workflow calls all release checks before granting its publish job
+`id-token: write`. Python 3.11/3.13 Linux checks, Windows regression and a separate
+Node 24.22.3 / npm 12.2.2 installation job must pass. The npm 12 job exports the
+audited artifacts with SHA-256 sums and uploads them for the publish job; the
+publish job verifies the sums and publishes that exact tarball with provenance.
+After publication it installs the exact registry version and checks `latest`.
+Create the GitHub Release from `docs/releases/<version>.md` after verification.
+
+For local npm 12 acceptance, provision Node compatible with npm 12 and run:
+
+```sh
+python3 scripts/check_release.py --wheelhouse /path/to/wheels --artifact-dir /tmp/motata-release-artifacts
+python3 scripts/check_npm12_install.py --tarball /tmp/motata-release-artifacts/motata-0.3.0.tgz --version 0.3.0 --wheelhouse /path/to/wheels
+```
+
+The artifact directory must be empty. The installation script uses a temporary
+global prefix and empty npm configuration, without `--ignore-scripts` or script
+approval overrides. It requires npm 12 to skip postinstall by default, then
+verifies the first CLI launch bootstraps Python, subsequent launches reuse it,
+help/capability commands work, and updates retain the npm channel. These checks
+do not contact advertising APIs. The published package can be checked using
+`--package motata@0.3.0` instead of `--tarball`.
+
+Trigger a release by pushing its tag after pushing the reviewed source to main.
+`workflow_dispatch` also supports an existing version tag for retrying a failed
+pre-publication run. npm versions are immutable: if publishing succeeded but a
+later verification failed, repair and rerun verification separately rather than
+trying to publish the same version again.
+
 ## Distribution contract
 
 - `package.json`, `pyproject.toml`, `motata_cli.__version__`, and the current entry in `motata_cli/skills_compatibility.json` must agree.

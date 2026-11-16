@@ -14,6 +14,9 @@ class Limits:
     request_bytes: int = 1024 * 1024
     response_bytes: int = 8 * 1024 * 1024
     body_seconds: float = 15.0
+    upload_bytes: int = 256 * 1024 * 1024
+    upload_seconds: float = 300.0
+    uploads: int = 4
 
     def __post_init__(self):
         if not 1 <= self.per_account <= self.upstream <= self.admitted <= 1024:
@@ -22,6 +25,8 @@ class Limits:
             raise ValueError('Invalid time limits')
         if not 1024 <= self.request_bytes <= 8 * 1024 * 1024 or not 1024 <= self.response_bytes <= 32 * 1024 * 1024:
             raise ValueError('Invalid byte limits')
+        if not 1 <= self.uploads <= 8 or not 1 <= self.upload_bytes <= 512 * 1024 * 1024 or not 1 <= self.upload_seconds <= 900:
+            raise ValueError('Invalid upload limits')
 
 
 class Scheduler:
@@ -32,6 +37,7 @@ class Scheduler:
         self.accounts: dict[tuple, list] = {}
         self.active = 0
         self.peak = 0
+        self.upload_slots = asyncio.Semaphore(limits.uploads)
 
     @asynccontextmanager
     async def admission(self):

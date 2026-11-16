@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -64,6 +65,7 @@ class ReportInitDefaultsTests(unittest.TestCase):
         with (
             patch("motata_cli.report.tiktok.resolve_default_account", return_value=("998877", "init_config")),
             patch("motata_cli.report.tiktok.resolve_default_access_token", return_value=("demo-token", "environment")),
+            patch.dict(os.environ, {"TIKTOK_ACCESS_TOKEN": "demo-token"}),
             patch("motata_cli.report.tiktok.resolve_init_metrics", return_value=["spend", "conversion", "total_purchase_value"]),
             patch("motata_cli.report.tiktok.load_init_profile", return_value={"platform": "tiktok", "account_id": "998877"}),
         ):
@@ -78,6 +80,22 @@ class ReportInitDefaultsTests(unittest.TestCase):
         self.assertEqual(payload["options"]["access_token_source"], "environment")
         self.assertEqual(payload["options"]["analysis_metrics"], ["spend", "conversion", "total_purchase_value"])
         self.assertEqual(payload["options"]["analysis_metrics_source"], "init_profile")
+
+    def test_tiktok_auth_center_dry_run_needs_no_key_or_token_request(self) -> None:
+        args = build_parser().parse_args([
+            'report', 'tiktok', 'run', '--account-id', '123', '--period', 'daily',
+            '--depth', 'fast', '--dry-run', '--token-source', 'auth-center',
+        ])
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch('motata_cli.report.tiktok.load_init_profile', return_value={}),
+            patch('motata_cli.report.tiktok.resolve_init_metrics', return_value=[]),
+            patch('motata_cli.report.tiktok.resolve_default_access_token', side_effect=AssertionError('Dry run must not resolve secrets')),
+            patch('requests.Session.request', side_effect=AssertionError('Dry run must not access the network')),
+            redirect_stdout(io.StringIO()) as output,
+        ):
+            command_tiktok_report_run(args)
+        self.assertEqual(json.loads(output.getvalue())['options']['access_token_source'], 'not_required_dry_run')
 
     def test_meta_report_can_batch_all_init_accounts(self) -> None:
         parser = build_parser()

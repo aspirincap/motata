@@ -47,13 +47,17 @@ class GatewayService:
         self.state.check_principal(principal)
         return principal
 
-    async def dispatch(self, request: PlatformRequest, principal: Principal) -> dict:
+    def preflight(self, request, principal):
         endpoint = select(request)
         validate_scope(principal, endpoint)
         reference = self.state.authorize(principal, request.platform, request.account_id, request.credential_ref)
         check_objects(request, self.state)
         if endpoint.write and not request.idempotency_key:
             raise GatewayError('IDEMPOTENCY_REQUIRED', 400, 'A stable idempotency key is required for writes.')
+        return endpoint, reference
+
+    async def dispatch(self, request: PlatformRequest, principal: Principal, *, upload=None) -> dict:
+        endpoint, reference = self.preflight(request, principal)
         key = (request.platform, request.account_id)
         async with self.scheduler.execution(key):
             # Re-check revocation and grants after any queue wait, before resolving a token.
@@ -63,7 +67,8 @@ class GatewayService:
             check_objects(request, self.state)
             owner = self.state.owner(principal, request.platform, request.account_id)
             fingerprint = hashlib.sha256(json.dumps(
-                {k: v for k, v in request.model_dump().items() if k not in ('request_id', 'idempotency_key')},
+                {'request': {k: v for k, v in request.model_dump().items() if k not in ('request_id', 'idempotency_key')},
+                 'upload': upload[0].model_dump(exclude={'request'}) if upload else None},
                 sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
             if endpoint.write:
                 previous = self.state.lookup_write(owner, request.idempotency_key, fingerprint)
@@ -82,7 +87,7 @@ class GatewayService:
                     return {**previous, 'request_id': request.request_id, 'replayed': True}
             secrets = (lease.value, *lease.sensitive_values)
             try:
-                status, data = await self.upstream(request, lease.value)
+                status, data = await self.upstream(request, lease.value, upload=upload) if upload else await self.upstream(request, lease.value)
                 error = data.get('error')
                 if status == 401 or (request.platform == 'meta' and isinstance(error, dict) and error.get('code') == 190):
                     self.credentials.invalidate(lease)  # NEXT request refetches; never replay this write.
@@ -99,8 +104,20 @@ class GatewayService:
                         result['write_outcome'] = 'confirmed_failed'
                     elif upstream_error:
                         raise GatewayError('WRITE_NEEDS_REVIEW', 502, 'Platform failure did not establish a safe write outcome.', 'unknown')
-                    elif request.platform == 'meta' and re.fullmatch(r'[0-9]+', str(safe.get('id', ''))):
-                        self.state.bind_object('meta', str(safe['id']), request.account_id, endpoint.object_type)
+                    elif request.platform == 'meta' and endpoint.update and safe.get('success') is True:
+                        result['write_outcome'] = 'confirmed_succeeded'
+                    elif request.platform == 'meta' and re.fullmatch(r'[0-9]+', str(safe.get(endpoint.result_key or 'id', ''))):
+                        self.state.bind_object('meta', str(safe[endpoint.result_key or 'id']), request.account_id, endpoint.object_type)
+                        result['write_outcome'] = 'confirmed_succeeded'
+                    elif request.platform == 'meta' and upload and request.path.endswith('/adimages') and isinstance(safe.get('images'), dict) and safe['images'] and all(isinstance(v, dict) and v.get('hash') for v in safe['images'].values()):
+                        result['write_outcome'] = 'confirmed_succeeded'
+                    elif request.platform == 'tiktok' and safe.get('code') in (0, '0'):
+                        payload = safe.get('data') or {}
+                        identifier = payload.get(endpoint.result_key) if isinstance(payload, dict) and endpoint.result_key else None
+                        if identifier:
+                            self.state.bind_object('tiktok', str(identifier), request.account_id, endpoint.object_type)
+                        if not (identifier or endpoint.update or upload):
+                            raise GatewayError('WRITE_NEEDS_REVIEW', 502, 'Create returned no authoritative object ID.', 'unknown')
                         result['write_outcome'] = 'confirmed_succeeded'
                     else:
                         raise GatewayError('WRITE_NEEDS_REVIEW', 502, 'Write returned no authoritative object ID.', 'unknown')
@@ -122,7 +139,7 @@ class GatewayService:
                     raise GatewayError(error.code, error.status, error.message, 'unknown') from None
                 raise
 
-    async def upstream(self, request: PlatformRequest, token: str) -> tuple[int, dict]:
+    async def upstream(self, request: PlatformRequest, token: str, *, upload=None) -> tuple[int, dict]:
         if request.platform == 'meta':
             url = f'https://graph.facebook.com/{self.meta_version}/{request.path}'
             headers = {'Authorization': 'Bearer ' + token, 'Accept': 'application/json', 'Accept-Encoding': 'identity'}
@@ -133,7 +150,11 @@ class GatewayService:
         for key, value in request.query.items():
             query[key] = json.dumps(value, separators=(',', ':')) if isinstance(value, (dict, list)) else value
         kwargs: dict[str, Any] = {'params': query, 'headers': headers}
-        if request.body is not None:
+        if upload:
+            from .uploads import multipart
+            kwargs['content'], extra_headers = multipart(*upload)
+            headers.update(extra_headers)
+        elif request.body is not None:
             # Meta form params that contain objects retain the existing JSON-string convention.
             if request.body_encoding == 'form':
                 kwargs['data'] = {k: json.dumps(v, separators=(',', ':')) if isinstance(v, (dict, list)) else v

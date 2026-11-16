@@ -7,6 +7,9 @@ from motata_cli.init_profile import PLATFORM_TOKEN_ENV_VARS
 
 def add_common_report_arguments(parser: argparse.ArgumentParser, *, platform: str) -> None:
     parser.add_argument("--access-token", default=None)
+    if platform == "tiktok":
+        from motata_cli.auth_center.provider import add_auth_arguments
+        add_auth_arguments(parser)
     parser.add_argument("--json", action="store_true", default=True)
     env_vars = PLATFORM_TOKEN_ENV_VARS.get(platform, ())
     if env_vars:
@@ -81,8 +84,8 @@ def register_report_commands(subparsers) -> None:
     p.add_argument("--no-compare", dest="compare", action="store_false", default=True)
     p.add_argument("--run-dir")
     p.add_argument("--dry-run", action="store_true", help="Print the planned data sources without calling TikTok APIs.")
-    p.add_argument("--retry", type=int, default=2, help="Attempts per source before marking it degraded.")
-    p.add_argument("--retry-wait", type=float, default=60.0, help="Seconds to wait before retrying a failed source.")
+    p.add_argument("--retry", type=int, default=5, help="Total attempts per read-only TikTok HTTP request (1-10); sources are not replayed.")
+    p.add_argument("--retry-wait", type=float, default=10.0, help="Initial exponential backoff ceiling in seconds; jitter and Retry-After apply.")
     p.add_argument("--top-objects", type=int, help="Top campaign/adgroup/ad objects to enrich for standard/full runs.")
     p.add_argument("--page-size", type=int, help="Override TikTok report page size.")
     p.add_argument("--smart-plus", action="store_true", help="Use Smart+ routes for detail enrichment when appropriate.")

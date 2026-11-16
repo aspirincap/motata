@@ -1,0 +1,1191 @@
+[
+  {
+    "client_method": "get_gmv_max_campaign",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "campaign_id": "1234567890"
+    },
+    "expected": {
+      "path": "campaign/gmv_max/info/",
+      "method": "GET",
+      "query": {
+        "advertiser_id": "1234567890",
+        "campaign_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "create_campaign",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": false
+    },
+    "expected": {
+      "path": "campaign/create/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "create_campaign",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": true
+    },
+    "expected": {
+      "path": "smart_plus/campaign/create/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "update_campaign",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": false
+    },
+    "expected": {
+      "path": "campaign/update/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "update_campaign",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": true
+    },
+    "expected": {
+      "path": "smart_plus/campaign/update/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "update_campaign_status",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": false
+    },
+    "expected": {
+      "path": "campaign/status/update/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "update_campaign_status",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": true
+    },
+    "expected": {
+      "path": "smart_plus/campaign/status/update/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "create_adgroup",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": false
+    },
+    "expected": {
+      "path": "adgroup/create/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "create_adgroup",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": true
+    },
+    "expected": {
+      "path": "smart_plus/adgroup/create/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "update_adgroup",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": false
+    },
+    "expected": {
+      "path": "adgroup/update/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "update_adgroup",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": true
+    },
+    "expected": {
+      "path": "smart_plus/adgroup/update/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "update_adgroup_status",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": false
+    },
+    "expected": {
+      "path": "adgroup/status/update/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "update_adgroup_status",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": true
+    },
+    "expected": {
+      "path": "smart_plus/adgroup/status/update/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "create_ad",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": false
+    },
+    "expected": {
+      "path": "ad/create/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "create_ad",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": true
+    },
+    "expected": {
+      "path": "smart_plus/ad/create/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "update_ad",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": false
+    },
+    "expected": {
+      "path": "ad/update/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "update_ad",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": true
+    },
+    "expected": {
+      "path": "smart_plus/ad/update/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "update_ad_status",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": false
+    },
+    "expected": {
+      "path": "ad/status/update/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "update_ad_status",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "smart_plus": true
+    },
+    "expected": {
+      "path": "smart_plus/ad/status/update/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "upload_image",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "file_path": "__FILE__"
+    },
+    "expected": {
+      "path": "file/image/ad/upload/",
+      "method": "POST",
+      "query": {},
+      "body": null,
+      "form": {
+        "advertiser_id": "1234567890",
+        "file_name": "sample.bin",
+        "image_signature": "c955ff453455ff13cd5d10141d3f9f24",
+        "upload_type": "UPLOAD_BY_FILE"
+      },
+      "files": [
+        "image_file"
+      ]
+    }
+  },
+  {
+    "client_method": "upload_video",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "file_path": "__FILE__"
+    },
+    "expected": {
+      "path": "file/video/ad/upload/",
+      "method": "POST",
+      "query": {},
+      "body": null,
+      "form": {
+        "advertiser_id": "1234567890",
+        "file_name": "sample.bin",
+        "is_third_party": false,
+        "video_signature": "c955ff453455ff13cd5d10141d3f9f24"
+      },
+      "files": [
+        "video_file"
+      ]
+    }
+  },
+  {
+    "client_method": "search_videos",
+    "kwargs": {
+      "advertiser_id": "1234567890"
+    },
+    "expected": {
+      "path": "file/video/ad/search/",
+      "method": "GET",
+      "query": {
+        "advertiser_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "delete_assets",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      }
+    },
+    "expected": {
+      "path": "creative/asset/delete/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "share_assets",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      }
+    },
+    "expected": {
+      "path": "creative/asset/share/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "get_account_info",
+    "kwargs": {
+      "advertiser_ids": [
+        "1234567890"
+      ]
+    },
+    "expected": {
+      "path": "advertiser/info/",
+      "method": "GET",
+      "query": {
+        "advertiser_ids": [
+          "1234567890"
+        ]
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "oauth2_advertiser_get",
+    "kwargs": {
+      "app_id": "1234567890",
+      "secret": "1234567890"
+    },
+    "expected": {
+      "path": "oauth2/advertiser/get/",
+      "method": "GET",
+      "query": {
+        "app_id": "1234567890",
+        "secret": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "update_account",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      }
+    },
+    "expected": {
+      "path": "advertiser/update/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_pixels",
+    "kwargs": {
+      "advertiser_id": "1234567890"
+    },
+    "expected": {
+      "path": "pixel/list/",
+      "method": "GET",
+      "query": {
+        "advertiser_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_offline_event_sets",
+    "kwargs": {},
+    "expected": {
+      "path": "offline/get/",
+      "method": "GET",
+      "query": {},
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_apps",
+    "kwargs": {
+      "advertiser_id": "1234567890"
+    },
+    "expected": {
+      "path": "app/list/",
+      "method": "GET",
+      "query": {
+        "advertiser_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "get_app_info",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "app_id": "1234567890"
+    },
+    "expected": {
+      "path": "app/info/",
+      "method": "GET",
+      "query": {
+        "advertiser_id": "1234567890",
+        "app_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_app_optimization_events",
+    "kwargs": {
+      "app_id": "1234567890",
+      "advertiser_id": "1234567890",
+      "optimization_goal": "1234567890"
+    },
+    "expected": {
+      "path": "app/optimization_event/",
+      "method": "GET",
+      "query": {
+        "app_id": "1234567890",
+        "advertiser_id": "1234567890",
+        "optimization_goal": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_catalogs",
+    "kwargs": {
+      "bc_id": "1234567890"
+    },
+    "expected": {
+      "path": "catalog/get/",
+      "method": "GET",
+      "query": {
+        "bc_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "get_catalog_eventsource_bindings",
+    "kwargs": {
+      "catalog_id": "1234567890",
+      "bc_id": "1234567890"
+    },
+    "expected": {
+      "path": "catalog/eventsource_bind/get/",
+      "method": "GET",
+      "query": {
+        "catalog_id": "1234567890",
+        "bc_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_stores",
+    "kwargs": {
+      "advertiser_id": "1234567890"
+    },
+    "expected": {
+      "path": "gmv_max/store/list/",
+      "method": "GET",
+      "query": {
+        "advertiser_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "gmv_max_report",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "store_ids": [
+        "1234567890"
+      ],
+      "dimensions": [
+        "1234567890"
+      ],
+      "metrics": [
+        "1234567890"
+      ],
+      "start_date": "2026-11-01",
+      "end_date": "2026-11-01"
+    },
+    "expected": {
+      "path": "gmv_max/report/get/",
+      "method": "GET",
+      "query": {
+        "advertiser_id": "1234567890",
+        "store_ids": [
+          "1234567890"
+        ],
+        "dimensions": [
+          "1234567890"
+        ],
+        "metrics": [
+          "1234567890"
+        ],
+        "start_date": "2026-11-01",
+        "end_date": "2026-11-01"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "search_regions",
+    "kwargs": {
+      "advertiser_id": "1234567890"
+    },
+    "expected": {
+      "path": "search/region/",
+      "method": "GET",
+      "query": {
+        "advertiser_id": "1234567890",
+        "language": null
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "targeting_search",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      }
+    },
+    "expected": {
+      "path": "tool/targeting/search/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "targeting_info",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      }
+    },
+    "expected": {
+      "path": "tool/targeting/info/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "targeting_list",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "location_ids": [
+        "1234567890"
+      ],
+      "scene": "1234567890"
+    },
+    "expected": {
+      "path": "tool/targeting/list/",
+      "method": "GET",
+      "query": {
+        "advertiser_id": "1234567890",
+        "location_ids": [
+          "1234567890"
+        ],
+        "scene": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "validate_url",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "url": "1234567890"
+    },
+    "expected": {
+      "path": "tool/url_validate/",
+      "method": "GET",
+      "query": {
+        "advertiser_id": "1234567890",
+        "url": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "get_vbo_status",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "objective_type": "1234567890",
+      "promotion_type": "1234567890",
+      "placements": [
+        "1234567890"
+      ]
+    },
+    "expected": {
+      "path": "tool/vbo_status/",
+      "method": "GET",
+      "query": {
+        "advertiser_id": "1234567890",
+        "objective_type": "1234567890",
+        "promotion_type": "1234567890",
+        "placements": [
+          "1234567890"
+        ]
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "smart_plus_material_report_overview",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "dimensions": [
+        "1234567890"
+      ]
+    },
+    "expected": {
+      "path": "smart_plus/material_report/overview/",
+      "method": "GET",
+      "query": {
+        "advertiser_id": "1234567890",
+        "dimensions": [
+          "1234567890"
+        ]
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "smart_plus_material_report_breakdown",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "dimensions": [
+        "1234567890"
+      ],
+      "start_date": "2026-11-01",
+      "end_date": "2026-11-01"
+    },
+    "expected": {
+      "path": "smart_plus/material_report/breakdown/",
+      "method": "GET",
+      "query": {
+        "advertiser_id": "1234567890",
+        "dimensions": [
+          "1234567890"
+        ],
+        "start_date": "2026-11-01",
+        "end_date": "2026-11-01"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_identities",
+    "kwargs": {
+      "advertiser_id": "1234567890"
+    },
+    "expected": {
+      "path": "identity/get/",
+      "method": "GET",
+      "query": {
+        "advertiser_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "create_identity",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      }
+    },
+    "expected": {
+      "path": "identity/create/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_creative_portfolios",
+    "kwargs": {
+      "advertiser_id": "1234567890"
+    },
+    "expected": {
+      "path": "creative/portfolio/list/",
+      "method": "GET",
+      "query": {
+        "advertiser_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "get_creative_portfolio",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "creative_portfolio_id": "1234567890"
+    },
+    "expected": {
+      "path": "creative/portfolio/get/",
+      "method": "GET",
+      "query": {
+        "advertiser_id": "1234567890",
+        "creative_portfolio_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "create_creative_portfolio",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      }
+    },
+    "expected": {
+      "path": "creative/portfolio/create/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "create_shareable_link",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      }
+    },
+    "expected": {
+      "path": "creative/shareable_link/create/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "generate_smart_text",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      }
+    },
+    "expected": {
+      "path": "creative/smart_text/generate/",
+      "method": "POST",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  }
+]

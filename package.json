@@ -1,7 +1,15 @@
 {
   "name": "motata",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Motata CLI for Meta and TikTok ads operations, distributed via npm with an embedded Python runtime bootstrap.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aspirincap/motata.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "bin": {
     "motata": "bin/motata.js",
     "motata-token": "bin/motata-token.js",

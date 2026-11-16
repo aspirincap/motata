@@ -48,7 +48,7 @@ def parse_bool_flags(*values: Any, deps: Any) -> Any:
 
 def generate_tiktok_request_id(*, deps: Any) -> str:
     # TikTok create APIs accept a numeric request_id even though the SDK types it as str.
-    return f"{deps.time.time_ns() % 10**19:019d}"
+    return str(deps.time.time_ns() % (2**63 - 1) + 1)
 
 
 def slugify_token(value: Any, fallback: str, *, deps: Any) -> str:
@@ -753,7 +753,9 @@ def build_adgroup_update_payload(args: argparse.Namespace, *, deps: Any) -> dict
     deps.assign_if_present(payload, "conversion_bid_price", args.conversion_bid_price)
     deps.assign_if_present(payload, "comment_disabled", args.comment_disabled)
     deps.assign_if_present(payload, "share_disabled", args.share_disabled)
-    deps.assign_if_present(payload, "pacing", args.pacing)
+    deps.assign_if_present(payload, "pacing", getattr(args, 'pacing', None))
+    for field in ('organic_comment_disabled', 'suggestion_audience_enabled', 'budget_auto_adjust_strategy'):
+        deps.assign_if_present(payload, field, getattr(args, field, None))
     deps.assign_if_present(payload, "schedule_start_time", args.start_time)
     deps.assign_if_present(payload, "schedule_end_time", args.end_time)
     deps.assign_if_present(payload, "schedule_type", args.schedule_type)

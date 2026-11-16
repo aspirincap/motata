@@ -6,6 +6,7 @@ import argparse
 import ast
 from email.parser import BytesParser
 import json
+import hashlib
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -25,6 +26,8 @@ SECRET = re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|(?:ghp_
 
 def audit(entries: dict[str, bytes]) -> None:
     for name, content in entries.items():
+        if 'tiktok_business_api_sdk/' in name or 'business_api_client/' in name or name.endswith('/transport/tiktok_sdk.py'):
+            raise ValueError(f'Unexpected TikTok SDK in artifact: {name}')
         parts = PurePosixPath(name).parts
         if name.startswith('/') or '..' in parts or any(p in FORBIDDEN or p.startswith('.env.') or p.endswith(('.pyc', '.pem', '.key', '.p12', '.pfx')) for p in parts):
             raise ValueError(f'Forbidden artifact path: {name}')
@@ -71,6 +74,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--wheelhouse', type=Path, help='Offline dependency wheels; enables fully isolated help smoke')
     parser.add_argument('--pack-only', action='store_true', help='Audit and rebuild artifacts without installing anything')
+    parser.add_argument('--artifact-dir', type=Path, help='Export audited artifacts and SHA256SUMS after the gate passes')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='motata-release-') as tmp:
         work = Path(tmp)
@@ -78,10 +82,14 @@ def main() -> None:
         source.mkdir()
         stage_source(source)
         env = {**os.environ, 'PIP_NO_INDEX': '1', 'PIP_DISABLE_PIP_VERSION_CHECK': '1', 'npm_config_offline': 'true', 'npm_config_ignore_scripts': 'true', 'NPM_CONFIG_USERCONFIG': str(work / 'empty-npm-config'), 'NPM_CONFIG_GLOBALCONFIG': str(work / 'empty-global-config'), 'MOTATA_SUPPRESS_SKILLS_NOTICE': '1'}
+        env['npm_config_cache'] = str(work / 'npm-cache')
+        env['PIP_CACHE_DIR'] = str(work / 'pip-cache')
         env.pop('PYTHONPATH', None)
         env.pop('MOTATA_INSTALL_METHOD', None)
         version = tomllib.loads((source / 'pyproject.toml').read_text())['project']['version']
-        assert json.loads((source / 'package.json').read_text())['version'] == version
+        package = json.loads((source / 'package.json').read_text())
+        assert package['version'] == version
+        assert package['repository'] == {'type': 'git', 'url': 'git+https://github.com/aspirincap/motata.git'}
         assert tomllib.loads((source / 'pyproject.toml').read_text())['project']['requires-python'] == '>=3.11'
         tree = ast.parse((source / 'motata_cli/__init__.py').read_text())
         py_version = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == '__version__' for t in n.targets))
@@ -124,6 +132,7 @@ def main() -> None:
         audit(rebuilt_entries)
         assert rebuilt_entries['motata_cli/skills_compatibility.json'] == (source / 'motata_cli/skills_compatibility.json').read_bytes()
         if args.pack_only:
+            export_artifacts(artifacts, args.artifact_dir)
             print('Offline artifact gate passed; installation smoke explicitly skipped (--pack-only).')
             return
         runtime = work / 'venv'
@@ -139,6 +148,8 @@ def main() -> None:
         run([str(python), '-I', '-c', smoke], work, env)
         if args.wheelhouse:
             run([str(python), '-I', '-m', 'motata_cli', '--help'], work, env)
+            http_smoke = "import sys; from unittest.mock import Mock; from motata_cli.tiktok.client import TikTokClient; t=Mock(); t.request.return_value={'code':0,'data':{}}; c=TikTokClient('offline-fixture',transport=t); c.list_campaigns('1',smart_plus=True); c.create_adgroup({'advertiser_id':'1','native_series_id':'2'},smart_plus=True); assert t.request.call_args.args[0].path=='smart_plus/adgroup/create/'; assert not any(n.startswith(('business_api_client','jwt')) for n in sys.modules)"
+            run([str(python), '-I', '-c', http_smoke], work, env)
             npm_dir = work / 'npm'
             npm_dir.mkdir()
             with tarfile.open(next(p for p in artifacts if p.suffix == '.tgz')) as archive:
@@ -149,7 +160,22 @@ def main() -> None:
             run([str(npm_python), '-I', '-c', "from motata_cli.update import detect_install_method; assert detect_install_method() == 'npm'"], work, {**npm_env, 'MOTATA_INSTALL_METHOD': 'npm'})
         else:
             print('NOTE: dependency-free isolated smoke only; supply --wheelhouse for CLI help smoke.')
+        export_artifacts(artifacts, args.artifact_dir)
         print('Offline release gate passed (temporary isolated installs only; no publish executed).')
+
+
+def export_artifacts(artifacts: list[Path], destination: Path | None) -> None:
+    if destination is None:
+        return
+    destination.mkdir(parents=True, exist_ok=True)
+    if any(destination.iterdir()):
+        raise ValueError('Artifact directory must be empty; refusing to mix release builds')
+    checksums = []
+    for artifact in artifacts:
+        shutil.copyfile(artifact, destination / artifact.name)
+        checksums.append(f'{hashlib.sha256(artifact.read_bytes()).hexdigest()}  {artifact.name}\n')
+    (destination / 'SHA256SUMS').write_text(''.join(checksums))
+    print(f'Audited artifacts exported to {destination}')
 
 
 if __name__ == '__main__':

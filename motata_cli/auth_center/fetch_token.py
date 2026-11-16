@@ -50,10 +50,6 @@ def build_query(args: argparse.Namespace) -> str:
         params["channel"] = args.channel
     if getattr(args, "account_status", None):
         params["account_status"] = args.account_status
-    if getattr(args, "page", None) is not None:
-        params["page"] = str(args.page)
-    if getattr(args, "page_size", None) is not None:
-        params["page_size"] = str(args.page_size)
 
     if not params:
         return ""
@@ -116,45 +112,18 @@ def request_payload(
     query: str = "",
     timeout: int = 30,
 ) -> dict:
-    url = base_url.rstrip("/") + path + query
-    request = urllib.request.Request(url=url, headers=build_headers(api_key, header_mode), method="GET")
+    from .provider import AuthCenterProvider, PREFIX
+    provider = AuthCenterProvider(api_key, base_url=base_url, header_mode=header_mode)
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            raw = response.read().decode("utf-8")
-        payload = json.loads(raw)
-    except (OSError, ValueError) as exc:
-        raise RuntimeError(network_error("Auth Center", exc)) from None
-    if not isinstance(payload, dict) or payload.get("success") is False:
-        raise RuntimeError("Auth Center returned an unsuccessful or invalid response.")
-    return payload
+        return provider.request("GET", path.removeprefix(PREFIX),
+                                params=dict(urllib.parse.parse_qsl(query.lstrip("?"))))
+    finally:
+        provider.close()
 
 
 def find_inventory_account(args: argparse.Namespace, payload: dict) -> dict | None:
-    """Follow numeric pages; the local contract guarantees accounts, not metadata.
-
-    Do not assume a short page is the last page (servers may cap page_size).
-    Detect ignored pagination and cap requests rather than looping indefinitely.
-    """
-    seen: set[tuple[str, ...]] = set()
-    page_args = argparse.Namespace(**vars(args))
-    page_args.page = getattr(args, "page", None) or 1
-    for _ in range(1000):
-        account = extract_inventory_account(payload, args.account_id)
-        if account is not None:
-            return account
-        accounts = _inventory_accounts(payload)
-        if not accounts:
-            return None
-        signature = tuple(sorted(str(item.get("account_id")) for item in accounts))
-        if signature in seen:
-            raise RuntimeError("Inventory pagination repeated a page; account lookup is incomplete.")
-        seen.add(signature)
-        page_args.page += 1
-        payload = request_payload(
-            base_url=args.base_url, path=build_path(args), api_key=args.api_key,
-            header_mode=args.header, query=build_query(page_args),
-        )
-    raise RuntimeError("Inventory page limit reached; account lookup is incomplete.")
+    """v0.3.9 returns the entire inventory; page arguments are not supported."""
+    return extract_inventory_account(payload, args.account_id)
 
 
 def fetch_access_token(
@@ -199,10 +168,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--account-id", help="Ad account ID (required for account mode; optional for inventory filtering)")
     parser.add_argument("--account-status", help="Inventory filter for account_status")
     parser.add_argument("--channel", choices=["google", "meta", "facebook", "tiktok"])
-    parser.add_argument("--page", type=int, default=1, help="Inventory page number")
-    parser.add_argument("--page-size", type=int, default=20, help="Inventory page size")
+    parser.add_argument("--page", type=int, default=1, help="Deprecated: v0.3.9 inventory is unpaginated")
+    parser.add_argument("--page-size", type=int, default=20, help="Deprecated: v0.3.9 inventory is unpaginated")
     parser.add_argument("--compact", action="store_true", help="Inventory mode: print TSV rows for channel, account_id, access_token, account_name")
-    parser.add_argument("--base-url", default=os.getenv("AUTH_CENTER_BASE_URL", "http://localhost:8000"))
+    parser.add_argument("--base-url", default=os.getenv("AUTH_CENTER_BASE_URL", "https://motata.one"))
     parser.add_argument("--api-key", default=os.getenv("AUTH_CENTER_API_KEY"))
     parser.add_argument("--header", choices=["x-api-key", "bearer"], default="x-api-key")
     parser.add_argument("--json", action="store_true", help="Print full JSON response")

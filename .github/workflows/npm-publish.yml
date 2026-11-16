@@ -1,0 +1,65 @@
+name: Publish npm with OIDC
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.repository == 'aspirincap/motata' && startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/release-check.yml
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.22.3'
+          package-manager-cache: false
+      - run: npm install --global npm@12.2.2
+      - name: Validate release identity
+        run: |
+          test "$GITHUB_REF_NAME" = "v$(node -p "require('./package.json').version")"
+          test "$(node -p "require('./package.json').name")" = motata
+          test "$(node -p "require('./package.json').repository.url")" = git+https://github.com/aspirincap/motata.git
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - uses: actions/download-artifact@v4
+        with:
+          name: motata-npm-release
+          path: dist/release
+      - name: Verify tested artifact and publish using OIDC
+        working-directory: dist/release
+        env:
+          NPM_CONFIG_USERCONFIG: ${{ runner.temp }}/motata-empty-npmrc
+          NPM_CONFIG_GLOBALCONFIG: ${{ runner.temp }}/motata-empty-global-npmrc
+        run: |
+          touch "$NPM_CONFIG_USERCONFIG" "$NPM_CONFIG_GLOBALCONFIG"
+          test -n "$ACTIONS_ID_TOKEN_REQUEST_URL"
+          test -z "${NODE_AUTH_TOKEN:-}${NPM_TOKEN:-}"
+          sha256sum --check SHA256SUMS
+          version="${GITHUB_REF_NAME#v}"
+          test "$(tar -xOf "motata-$version.tgz" package/package.json | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version")" = "$version"
+          npm publish "motata-$version.tgz" --access public --tag latest --provenance --ignore-scripts --registry https://registry.npmjs.org/
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Accept the published npm package
+        run: |
+          python -m pip download --only-binary=:all: --dest /tmp/motata-wheelhouse -r requirements-release.txt
+          python scripts/check_npm12_install.py --package "motata@${GITHUB_REF_NAME#v}" --version "${GITHUB_REF_NAME#v}" --wheelhouse /tmp/motata-wheelhouse
+          test "$(npm view motata dist-tags.latest --registry https://registry.npmjs.org/)" = "${GITHUB_REF_NAME#v}"
+          npm view "motata@${GITHUB_REF_NAME#v}" dist.attestations --json --registry https://registry.npmjs.org/

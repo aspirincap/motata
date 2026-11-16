@@ -45,10 +45,16 @@ scripts/*
 !scripts/generate_motata_html_report.py
 !scripts/build_skill_registry.py
 !scripts/check_release.py
+!scripts/check_npm12_install.py
 !scripts/run_offline_tests.py
+!scripts/check_tiktok_http.py
+!scripts/check_tiktok_live.py
+!scripts/check_tiktok_docs.py
+/.tiktok-contract-cache/
 
 /*.md
 !/README.md
+!/plan.md
 /tmp_*
 /skills-lock.json
 /.runtime/

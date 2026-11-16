@@ -108,6 +108,8 @@ def validate_smartplus_app_eligibility(
 ) -> dict[str, Any] | None:
     if str(payload.get("objective_type") or "").upper() != "APP_PROMOTION":
         return None
+    if str(payload.get("app_promotion_type") or "").upper() == "MINIS":
+        return None
     app_id = str(payload.get("app_id") or "").strip()
     if not app_id:
         return None

@@ -1,6 +1,8 @@
 """HTTPS gateway transport. Carries only a short-lived gateway JWT, never platform tokens."""
 from __future__ import annotations
 import json
+import hashlib
+import io
 import os
 import re
 import stat
@@ -90,6 +92,11 @@ class RemoteGatewayTransport:
     def request(self, *, auth: GatewayAuthRef, method: str, path: str,
                 query: dict | None = None, body: dict | None = None, body_encoding='json',
                 idempotency_key: str | None = None) -> dict:
+        route, payload = self._prepare(auth=auth, method=method, path=path, query=query, body=body,
+                                       body_encoding=body_encoding, idempotency_key=idempotency_key)
+        return self._send(route, json=payload)
+
+    def _prepare(self, *, auth, method, path, query=None, body=None, body_encoding='json', idempotency_key=None):
         if not isinstance(auth, GatewayAuthRef):
             raise CliError('Gateway transport requires an authorization reference, not an access token.')
         account = auth.account_id
@@ -113,10 +120,41 @@ class RemoteGatewayTransport:
                        'platform': auth.platform, 'account_id': account, 'credential_ref': auth.credential_ref,
                        'method': method.upper(), 'path': path.lstrip('/'), 'query': query or {}, 'body': body,
                        'body_encoding': body_encoding, 'idempotency_key': idempotency_key}
+        return route, payload
+
+    def upload(self, *, files, **kwargs):
+        if len(files) != 1:
+            raise CliError('Gateway uploads support exactly one media file per request.')
+        route, payload = self._prepare(**kwargs)
+        if route != '/v1/platform/request':
+            raise CliError('Invalid upload target.')
+        field, entry = next(iter(files.items()))
+        name, stream, mime = entry
+        stream = io.BytesIO(stream) if isinstance(stream, bytes) else stream
+        start = stream.tell()
+        digest, size = hashlib.sha256(), 0
+        for chunk in iter(lambda: stream.read(65536), b''):
+            size += len(chunk)
+            if size > 512 * 1024 * 1024:
+                raise CliError('Gateway upload exceeds maximum file size.')
+            digest.update(chunk)
+        stream.seek(start)
+        name = re.sub(r'[^A-Za-z0-9_.-]', '_', Path(name).name)[:128] or 'media.bin'
+        header = json.dumps({'request': payload, 'field': field, 'filename': name,
+                             'content_type': mime, 'size': size, 'sha256': digest.hexdigest()},
+                            separators=(',', ':'), allow_nan=False).encode()
+        def chunks():
+            yield len(header).to_bytes(4, 'big') + header
+            for chunk in iter(lambda: stream.read(65536), b''):
+                yield chunk
+        return self._send('/v1/platform/upload', data=chunks(),
+                          extra_headers={'Content-Type': 'application/vnd.motata.upload'}, timeout=600)
+
+    def _send(self, route, *, extra_headers=None, timeout=210, **kwargs):
         try:
-            response = self.session.post(self.endpoint + route, json=payload,
-                                         headers={'Authorization': 'Bearer ' + self._jwt()},
-                                         timeout=(10, 210), allow_redirects=False, stream=True)
+            response = self.session.post(self.endpoint + route, **kwargs,
+                                         headers={'Authorization': 'Bearer ' + self._jwt(), **(extra_headers or {})},
+                                         timeout=(10, timeout), allow_redirects=False, stream=True)
             with response:
                 raw = bytearray()
                 for chunk in response.iter_content(65536):
@@ -153,6 +191,8 @@ REVIEWED_HANDLERS = {
 def guard_command(args):
     if not gateway_enabled():
         return
+    if args.command == 'tiktok':
+        raise CliError('TikTok uses Direct HTTP only; gateway mode is unsupported and will not fall back.', exit_code=2)
     check_agent_environment()
     for name, value in vars(args).items():
         if (name.endswith('access_token') or name == 'api_key') and value is not None:

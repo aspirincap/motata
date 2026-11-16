@@ -1,0 +1,109 @@
+{
+  "provenance": {
+    "retrieved_at": "2026-11-12T09:30:24.784464+00:00",
+    "sources": [
+      {
+        "url": "https://business-api.tiktok.com/portal/docs/create-an-upgraded-smart-mini-series-feed-campaign/v1.3",
+        "markdown_sha256": "b8990c0b61bad374cb06eecdd25a96ccdaf26221cd9961529a4c7bdcf0d3c0c5"
+      },
+      {
+        "url": "https://business-api.tiktok.com/portal/docs/update-an-upgraded-smart-ad-group/v1.3",
+        "markdown_sha256": "d2af9f81e2776e421a02cce93e2ee51c47b4191fd3c3bba32a8a9ae8894359df"
+      }
+    ],
+    "transformation": "Request examples only; placeholders replaced with synthetic IDs, budget 50, ROAS 1.5 and UTC December 2026 dates. No credentials."
+  },
+  "requests": {
+    "campaign": {
+      "advertiser_id": "fixture-advertiser_id",
+      "request_id": "fixture-request_id",
+      "objective_type": "APP_PROMOTION",
+      "app_promotion_type": "MINIS",
+      "campaign_type": "REGULAR_CAMPAIGN",
+      "catalog_enabled": false,
+      "campaign_name": "fixture-campaign_name",
+      "budget_optimize_on": true,
+      "budget_mode": "BUDGET_MODE_DYNAMIC_DAILY_BUDGET",
+      "budget": 50
+    },
+    "adgroup": {
+      "advertiser_id": "fixture-advertiser_id",
+      "campaign_id": "fixture-campaign_id",
+      "request_id": "fixture-request_id",
+      "adgroup_name": "fixture-adgroup_name",
+      "promotion_type": "NATIVE_SERIES",
+      "identity_type": "BC_AUTH_TT",
+      "identity_id": "fixture-identity_id",
+      "identity_authorized_bc_id": "fixture-identity_authorized_bc_id",
+      "native_series_id": "fixture-native_series_id",
+      "optimization_goal": "VALUE",
+      "optimization_event": "AD_REVENUE_VALUE",
+      "bid_type": "BID_TYPE_NO_BID",
+      "deep_bid_type": "VO_MIN_ROAS",
+      "roas_bid": 1.5,
+      "vbo_window": "ZERO_DAY",
+      "billing_event": "OCPM",
+      "schedule_type": "SCHEDULE_START_END",
+      "schedule_start_time": "2026-12-01 00:00:00",
+      "schedule_end_time": "2026-12-08 00:00:00",
+      "placement_type": "PLACEMENT_TYPE_NORMAL",
+      "placements": [
+        "PLACEMENT_TIKTOK"
+      ],
+      "targeting_optimization_mode": "AUTOMATIC",
+      "targeting_spec": {
+        "location_ids": [
+          "fixture-location_id"
+        ]
+      }
+    },
+    "ad": {
+      "advertiser_id": "fixture-advertiser_id",
+      "adgroup_id": "fixture-adgroup_id",
+      "ad_name": "fixture-ad_name",
+      "creative_list": [
+        {
+          "creative_info": {
+            "ad_format": "SINGLE_VIDEO",
+            "image_info": [
+              {
+                "web_uri": "fixture-web_uri"
+              }
+            ],
+            "video_info": {
+              "video_id": "fixture-video_id"
+            },
+            "identity_type": "BC_AUTH_TT",
+            "identity_id": "fixture-identity_id",
+            "identity_authorized_bc_id": "fixture-identity_authorized_bc_id"
+          }
+        }
+      ],
+      "ad_text_list": [
+        {
+          "ad_text": "fixture-ad_text"
+        },
+        {
+          "ad_text": "fixture-ad_text"
+        },
+        {
+          "ad_text": "fixture-ad_text"
+        },
+        {
+          "ad_text": "fixture-ad_text"
+        },
+        {
+          "ad_text": "fixture-ad_text"
+        }
+      ],
+      "ad_configuration": {
+        "call_to_action_id": "fixture-call_to_action_id"
+      }
+    },
+    "update": {
+      "advertiser_id": "fixture-advertiser_id",
+      "adgroup_id": "fixture-adgroup_id",
+      "adgroup_name": "fixture-adgroup_name"
+    }
+  }
+}

@@ -70,6 +70,9 @@ def resolve_default_accounts(platform: str) -> tuple[list[str], str | None]:
 
 
 def resolve_default_access_token(platform: str) -> tuple[str | None, str | None]:
+    if platform == "tiktok" and (load_init_profile(platform).get("token_source") == "auth-center" or os.getenv("AUTH_CENTER_API_KEY")):
+        from motata_cli.auth_center.provider import resolve_tiktok_credential
+        return resolve_tiktok_credential()
     env_vars = PLATFORM_TOKEN_ENV_VARS.get(platform, ())
     value = _env_first(*env_vars)
     if value:

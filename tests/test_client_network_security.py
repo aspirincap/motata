@@ -17,21 +17,15 @@ import requests
 from motata_cli.common.security import redact
 from motata_cli.auth_center import fetch_token
 from motata_cli.meta.client import MetaClient, configure_meta_debug
-# Isolate client tests from unrelated CLI command registration and circular imports.
-_spec = importlib.util.spec_from_file_location(
-    "_network_test_tiktok.client",
-    Path(__file__).resolve().parents[1] / "motata_cli/tiktok/client.py",
-)
-_module = importlib.util.module_from_spec(_spec)
-_sdk = types.ModuleType("_network_test_tiktok.sdk")
-_sdk.get_business_api_client = Mock(side_effect=AssertionError("SDK construction forbidden"))
-with patch.dict(sys.modules, {"_network_test_tiktok": types.ModuleType("_network_test_tiktok"), "_network_test_tiktok.sdk": _sdk}):
-    _spec.loader.exec_module(_module)
-TikTokClient = _module.TikTokClient
+from motata_cli.tiktok.client import TikTokClient
+from motata_cli.transport.tiktok_http import TikTokHTTP
 
 
 class NetworkSecurityTests(unittest.TestCase):
     def setUp(self):
+        limiter = patch('motata_cli.transport.tiktok_http.default_read_throttle')
+        limiter.start().return_value.acquire_delay.return_value = 0.0
+        self.addCleanup(limiter.stop)
         # Fail closed: even an accidentally unmocked request cannot reach a socket.
         self.socket_guard = patch("socket.socket.connect", side_effect=AssertionError("Real network forbidden"))
         self.socket_guard.start()
@@ -142,35 +136,38 @@ class NetworkSecurityTests(unittest.TestCase):
         self.assertNotIn("other-secret", str(raised.exception))
         self.assertIn("190", str(raised.exception))
 
-    def test_tiktok_sdk_timeout_and_safe_exception(self):
-        client = TikTokClient.__new__(TikTokClient)
-        client.access_token = "private-token"
-        fn = Mock(return_value={"code": 0})
-        self.assertEqual(client._invoke(fn), {"code": 0})
-        self.assertEqual(fn.call_args.kwargs["_request_timeout"], (10, 120))
-        fn.side_effect = RuntimeError("private-token arbitrary-secret")
+    def test_tiktok_http_timeout_and_safe_exception(self):
+        session = Mock()
+        session.request.side_effect = requests.ReadTimeout("private-token arbitrary-secret")
+        client = TikTokClient("private-token", transport=TikTokHTTP("private-token", session=session))
         with self.assertRaises(Exception) as raised:
-            client._invoke(fn)
+            client.create_campaign({"advertiser_id": "123"})
         self.assertNotIn("arbitrary-secret", str(raised.exception))
         self.assertTrue(raised.exception.__suppress_context__)
+        self.assertEqual(raised.exception.write_outcome, "unknown")
+        session.request.assert_called_once()
 
-    def test_tiktok_raw_read_write_and_invalid_json_no_retry(self):
-        client = TikTokClient.__new__(TikTokClient)
-        client.access_token = "private-token"
-        for method in ("GET", "POST", "PUT", "DELETE"):
-            with self.subTest(method=method), patch("requests.request",
-                    side_effect=requests.ReadTimeout("private-token other-secret")) as request:
-                with self.assertRaises(Exception) as raised:
-                    client._raw_request(method, "campaign/create/", timeout=15)
-                request.assert_called_once()
-                self.assertEqual(request.call_args.kwargs["timeout"], (10, 15))
-                self.assertNotIn("other-secret", str(raised.exception))
-                self.assertEqual("verify remote state" in str(raised.exception), method != "GET")
-        response = self.response({})
-        response.json.side_effect = ValueError("private-response-body")
-        with patch("requests.request", return_value=response):
+    @patch('motata_cli.transport.tiktok_http.time.sleep')
+    def test_tiktok_raw_read_retry_and_single_write_remain_redacted(self, sleep):
+        for method, path in (("GET", "campaign/get/"), ("POST", "campaign/create/")):
+            session = Mock()
+            session.request.side_effect = requests.ReadTimeout("private-token other-secret")
+            client = TikTokClient("private-token", transport=TikTokHTTP("private-token", session=session))
             with self.assertRaises(Exception) as raised:
-                client._raw_request("POST", "campaign/create/")
+                client._raw_request(method, path, timeout=15)
+            self.assertEqual(session.request.call_count, 5 if method == 'GET' else 1)
+            self.assertEqual(session.request.call_args.kwargs["timeout"], (10, 15))
+            self.assertNotIn("other-secret", str(raised.exception))
+            self.assertEqual("verify remote state" in str(raised.exception), method != "GET")
+        session = Mock()
+        result = requests.Response()
+        result.status_code = 200
+        result._content = b"private-response-body"
+        result._content_consumed = True
+        session.request.return_value = result
+        client = TikTokClient("private-token", transport=TikTokHTTP("private-token", session=session))
+        with self.assertRaises(Exception) as raised:
+            client._raw_request("POST", "campaign/create/")
         self.assertNotIn("private-response-body", str(raised.exception))
         self.assertIn("verify remote state", str(raised.exception))
 
@@ -180,13 +177,14 @@ class NetworkSecurityTests(unittest.TestCase):
             result = fetch_token.main(["--mode", "inventory", "--api-key", "api-secret", "--account-id", "target", *extra])
         return result, stdout.getvalue(), stderr.getvalue(), request
 
-    def test_inventory_cross_page_lookup_even_after_short_page(self):
-        pages = [{"data": {"accounts": [{"account_id": "other", "token": {"access_token": "other-secret"}}]}},
-                 {"data": {"accounts": [{"account_id": "target", "token": {"access_token": "target-token"}}]}}]
+    def test_inventory_full_response_lookup_without_pagination(self):
+        pages = [{"data": {"accounts": [{"account_id": "other", "token": {"access_token": "other-secret"}},
+                                         {"account_id": "target", "token": {"access_token": "target-token"}}]}}]
         result, out, err, request = self.run_inventory(pages, "--channel", "meta")
         self.assertEqual((result, out, err), (0, "target-token\n", ""))
         self.assertIn("channel=meta", request.call_args.kwargs["query"])
-        self.assertIn("page=2", request.call_args.kwargs["query"])
+        self.assertNotIn("page=", request.call_args.kwargs["query"])
+        request.assert_called_once()
 
     def test_inventory_missing_and_repeated_page_do_not_dump_tokens(self):
         page = {"data": {"accounts": [{"account_id": "other", "token": {"access_token": "other-secret"}}]}}
@@ -195,7 +193,7 @@ class NetworkSecurityTests(unittest.TestCase):
             self.assertEqual(result, 1)
             self.assertEqual(out, "")
             self.assertNotIn("other-secret", err)
-            self.assertEqual(request.call_count, 2)
+            self.assertEqual(request.call_count, 1)
 
     def test_inventory_malformed_pages_and_missing_token_are_safe(self):
         for page in ({"data": "body-secret"}, {"data": {"accounts": ["body-secret"]}},
@@ -208,23 +206,26 @@ class NetworkSecurityTests(unittest.TestCase):
             self.assertNotIn("refresh-secret", err)
             request.assert_called_once()
 
-    def test_inventory_later_page_failure_is_safe(self):
+    def test_inventory_does_not_request_unsupported_later_pages(self):
         first = {"data": {"accounts": [{"account_id": "other"}]}}
         result, out, err, request = self.run_inventory([first, RuntimeError("api-secret body-secret")])
         self.assertEqual((result, out), (1, ""))
         self.assertNotIn("api-secret", err)
         self.assertNotIn("body-secret", err)
-        self.assertEqual(request.call_count, 2)
+        self.assertEqual(request.call_count, 1)
 
     def test_auth_http_body_and_exception_not_echoed(self):
-        error = urllib.error.HTTPError("https://host/?api_key=url-secret", 403, "body-secret", {}, io.BytesIO(b"response-secret"))
-        with patch("urllib.request.urlopen", side_effect=error):
+        response = requests.Response()
+        response.status_code = 403
+        response._content = b"response-secret"
+        response._content_consumed = True
+        with patch("requests.Session.request", return_value=response):
             with self.assertRaises(RuntimeError) as raised:
                 fetch_token.request_payload(base_url="https://host", path="/tokens", api_key="api-secret", header_mode="bearer")
         self.assertIn("403", str(raised.exception))
-        self.assertTrue(raised.exception.__suppress_context__)
-        for secret in ("body-secret", "response-secret", "url-secret"):
+        for secret in ("body-secret", "response-secret", "url-secret", "api-secret"):
             self.assertNotIn(secret, str(raised.exception))
+
 
 
 if __name__ == "__main__":

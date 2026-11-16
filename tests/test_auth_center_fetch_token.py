@@ -24,7 +24,7 @@ class AuthCenterFetchTokenTests(unittest.TestCase):
         )
         self.assertEqual(
             fetch_token.build_query(args),
-            "?channel=tiktok&account_status=ACTIVE&page=2&page_size=50",
+            "?channel=tiktok&account_status=ACTIVE",
         )
 
     def test_format_inventory_compact_skips_missing_tokens(self) -> None:

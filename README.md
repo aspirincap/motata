@@ -1,6 +1,6 @@
 # motata-cli
 
-> Experimental JWT Gateway work is on this branch. See [gateway runbook](docs/gateway.md) and [implementation status](docs/gateway-implementation-status.md). The full CLI gateway migration is **not complete**; unsupported gateway operations fail closed. Direct mode remains compatible. The legacy examples below describe direct mode; gateway-mode agents must follow the gateway runbook and must not use token helpers.
+> TikTok uses **Auth Center v0.3.9 API Key token delivery + Direct HTTP**. No TikTok SDK or additional JWT login is required. Explicit TikTok gateway mode is unsupported and never falls back silently. The separate experimental Gateway implementation remains documented in the [gateway runbook](docs/gateway.md).
 
 `motata` is a modular ads operations CLI for Meta and TikTok.
 It is designed for real account work: onboarding, asset discovery, validation, reporting, migration, and cross-account analysis.
@@ -24,7 +24,7 @@ The CLI is self-contained:
 - install from npm with `npm install -g motata`
 - use bundled helpers such as `motata-token` and `motata-auth-center-token`
 
-The npm package bootstraps a local Python virtualenv during install, so `python3` must be available on the target machine.
+The npm package bootstraps a local Python virtualenv, so Python `3.11+` must be available on the target machine. npm 12 disables dependency install scripts by default; the first `motata` command automatically creates the runtime instead. No `approve-scripts` step is required. That first run needs access to PyPI (or a configured offline wheelhouse); later runs reuse the runtime.
 
 ## Installation
 
@@ -38,6 +38,7 @@ From npm:
 
 ```bash
 npm install -g motata
+motata --version
 ```
 
 From source:
@@ -381,7 +382,7 @@ Use the same `--job-id` with `resume`. Confirmed operations are skipped; uncerta
 - Pagination limits are explicit. Monetary aggregation and rankings remain within a currency; unknown currencies remain account-isolated. No automatic FX conversion is performed.
 - npm runtime checks Python >=3.11, repairs incomplete installs, serializes initialization, and preserves the caller's working directory.
 - Published skills have a single source: `registry/skills/`. Root copies, `skills/` symlinks and local agent installations are not release sources.
-- Version 0.2.0 is prepared as an unreleased candidate on this branch. Review the [0.2.0 release notes and upgrade guidance](docs/releases/0.2.0.md); test/build commands do not publish packages or the registry.
+- Review the [0.3.0 migration and validation notes](https://github.com/aspirincap/motata/blob/v0.3.0/docs/releases/0.3.0.md). Version-tag releases use GitHub Actions OIDC; test/build commands do not publish packages or the registry.
 
 ```bash
 python3 scripts/run_offline_tests.py

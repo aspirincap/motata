@@ -1,11 +1,15 @@
 """Offline copy/bootstrap regression tests; no credentials or runtime directories."""
 import contextlib
 import io
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from motata_cli import __main__ as cli
 from motata_cli.tiktok import commands as commands
+from motata_cli.tiktok.errors import TikTokError
+from motata_cli.tiktok.operations import OperationStore
 
 
 class TikTokBootstrapTests(unittest.TestCase):
@@ -16,6 +20,9 @@ class TikTokBootstrapTests(unittest.TestCase):
                        {'source-group': [{'ad_id': 'source-ad'}]}, {'target_smart_plus': True})
         self.stack = contextlib.ExitStack()
         self.addCleanup(self.stack.close)
+        directory = self.stack.enter_context(tempfile.TemporaryDirectory())
+        self.store = OperationStore(Path(directory) / 'steps.sqlite3')
+        self.stack.enter_context(patch('motata_cli.tiktok.services.campaign_copy.OperationStore', return_value=self.store))
         self.stack.enter_context(patch('socket.socket.connect',
                                       side_effect=AssertionError('Network forbidden in offline tests')))
         self.stack.enter_context(patch.object(commands, 'resolve_tiktok_client', return_value=('123', self.client)))
@@ -51,6 +58,41 @@ class TikTokBootstrapTests(unittest.TestCase):
         self.assertEqual(result['campaigns'][0]['adgroups'][0]['adgroup_id'], 'new-group')
         self.assertEqual(result['campaigns'][0]['ads'][0]['response']['ad_ids'], ['new-ad'])
 
+    def test_resume_requires_original_job_id_before_reading_or_writing(self):
+        with self.assertRaisesRegex(commands.CliError, 'original --job-id'):
+            self.copy(resume=True)
+        commands.load_tiktok_campaign_copy_source.assert_not_called()
+        self.client.create_campaign.assert_not_called()
+
+    def test_resume_reuses_and_reads_successful_objects(self):
+        first = self.copy(job_id='stable-copy')
+        second = self.copy(job_id='stable-copy', resume=True)
+        self.assertEqual(first['status'], 'success')
+        self.assertEqual(second['status'], 'success')
+        for level in ('campaign', 'adgroup', 'ad'):
+            getattr(self.client, 'create_' + level).assert_called_once()
+            getattr(self.client, 'get_' + level).assert_called_once()
+
+    def test_resume_never_replays_ambiguous_child_write(self):
+        self.client.create_adgroup.side_effect = TikTokError('timeout', write_outcome='unknown')
+        self.copy(job_id='ambiguous-copy')
+        result = self.copy(job_id='ambiguous-copy', resume=True)
+        self.assertEqual(result['status'], 'partial_success')
+        self.assertEqual(result['steps'][-1]['state'], 'unknown')
+        self.client.create_campaign.assert_called_once()
+        self.client.create_adgroup.assert_called_once()
+        self.client.create_ad.assert_not_called()
+
+    def test_explicit_resume_retries_rejected_child_without_recreating_parent(self):
+        self.client.create_adgroup.side_effect = TikTokError('rejected', write_outcome='failed')
+        self.copy(job_id='rejected-copy')
+        self.client.create_adgroup.side_effect = None
+        result = self.copy(job_id='rejected-copy', resume=True)
+        self.assertEqual(result['status'], 'success')
+        self.client.create_campaign.assert_called_once()
+        self.assertEqual(self.client.create_adgroup.call_count, 2)
+        self.client.create_ad.assert_called_once()
+
     def test_missing_campaign_id_counted_once(self):
         self.client.create_campaign.return_value = {'message': 'denied'}
         result = self.copy(copies=2)
@@ -77,7 +119,14 @@ class TikTokBootstrapTests(unittest.TestCase):
                     result = self.copy()
                     self.assertEqual(result['status'], 'partial_success')
                     self.assertEqual(result['campaigns'][0][kind + 's_failed'], 1)
-                    self.assertEqual(result['campaigns'][0]['errors'][0]['error'], 'denied')
+                    error = result['campaigns'][0]['errors'][0]['error']
+                    if isinstance(response, Exception):
+                        self.assertEqual(error, 'denied')
+                    else:
+                        # A response without an object ID is now an unknown write,
+                        # not proof that the platform rejected the operation.
+                        self.assertIn('no unambiguous object ID', error)
+                        self.assertEqual(result['steps'][-1]['state'], 'unknown')
                     method.side_effect = None
                     method.return_value = {'data': {kind + '_id': 'restored'}}
 

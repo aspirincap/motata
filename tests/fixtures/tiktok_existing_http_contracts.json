@@ -1,0 +1,602 @@
+[
+  {
+    "client_method": "create_changelog_task",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      }
+    },
+    "expected": {
+      "method": "POST",
+      "path": "changelog/task/create/",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "check_changelog_task",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "task_id": "1234567890"
+    },
+    "expected": {
+      "method": "GET",
+      "path": "changelog/task/check/",
+      "query": {
+        "advertiser_id": "1234567890",
+        "task_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "download_changelog_task",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "task_id": "1234567890"
+    },
+    "expected": {
+      "method": "GET",
+      "path": "changelog/task/download/",
+      "query": {
+        "advertiser_id": "1234567890",
+        "task_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_business_centers",
+    "kwargs": {},
+    "expected": {
+      "method": "GET",
+      "path": "bc/get/",
+      "query": {},
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_bc_assets",
+    "kwargs": {
+      "bc_id": "1234567890",
+      "asset_type": "1234567890"
+    },
+    "expected": {
+      "method": "GET",
+      "path": "bc/asset/get/",
+      "query": {
+        "bc_id": "1234567890",
+        "asset_type": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_campaigns",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "smart_plus": false
+    },
+    "expected": {
+      "method": "GET",
+      "path": "campaign/get/",
+      "query": {
+        "advertiser_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_campaigns",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "smart_plus": true
+    },
+    "expected": {
+      "method": "GET",
+      "path": "smart_plus/campaign/get/",
+      "query": {
+        "advertiser_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_gmv_max_campaigns",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "filtering": "1234567890"
+    },
+    "expected": {
+      "method": "GET",
+      "path": "gmv_max/campaign/get/",
+      "query": {
+        "advertiser_id": "1234567890",
+        "filtering": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_adgroups",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "smart_plus": false
+    },
+    "expected": {
+      "method": "GET",
+      "path": "adgroup/get/",
+      "query": {
+        "advertiser_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_adgroups",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "smart_plus": true
+    },
+    "expected": {
+      "method": "GET",
+      "path": "smart_plus/adgroup/get/",
+      "query": {
+        "advertiser_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_ads",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "smart_plus": false
+    },
+    "expected": {
+      "method": "GET",
+      "path": "ad/get/",
+      "query": {
+        "advertiser_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_ads",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "smart_plus": true
+    },
+    "expected": {
+      "method": "GET",
+      "path": "smart_plus/ad/get/",
+      "query": {
+        "advertiser_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "get_image_info",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "image_ids": [
+        "1234567890"
+      ]
+    },
+    "expected": {
+      "method": "GET",
+      "path": "file/image/ad/info/",
+      "query": {
+        "advertiser_id": "1234567890",
+        "image_ids": [
+          "1234567890"
+        ]
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "get_video_info",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "video_ids": [
+        "1234567890"
+      ]
+    },
+    "expected": {
+      "method": "GET",
+      "path": "file/video/ad/info/",
+      "query": {
+        "advertiser_id": "1234567890",
+        "video_ids": [
+          "1234567890"
+        ]
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_tt_videos",
+    "kwargs": {
+      "advertiser_id": "1234567890"
+    },
+    "expected": {
+      "method": "GET",
+      "path": "tt_video/list/",
+      "query": {
+        "advertiser_id": "1234567890",
+        "item_types": [
+          "VIDEO",
+          "CAROUSEL"
+        ],
+        "page": 1,
+        "page_size": 20
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_aigc_voices",
+    "kwargs": {
+      "advertiser_id": "1234567890"
+    },
+    "expected": {
+      "method": "GET",
+      "path": "creative/aigc/voice/get/",
+      "query": {
+        "advertiser_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "create_image_animation_task",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      }
+    },
+    "expected": {
+      "method": "POST",
+      "path": "creative/aigc/image_animation/task/create/",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "create_aigc_video_task",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      }
+    },
+    "expected": {
+      "method": "POST",
+      "path": "creative/aigc/video/task/create/",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_aigc_video_tasks",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "aigc_video_type": "1234567890"
+    },
+    "expected": {
+      "method": "GET",
+      "path": "creative/aigc/video/task/list/",
+      "query": {
+        "advertiser_id": "1234567890",
+        "aigc_video_type": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_aigc_videos",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "aigc_video_types": [
+        "1234567890"
+      ]
+    },
+    "expected": {
+      "method": "GET",
+      "path": "creative/aigc/video/list/",
+      "query": {
+        "advertiser_id": "1234567890",
+        "aigc_video_types": [
+          "1234567890"
+        ]
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_digital_avatars",
+    "kwargs": {
+      "advertiser_id": "1234567890"
+    },
+    "expected": {
+      "method": "GET",
+      "path": "creative/digital_avatar/get/",
+      "query": {
+        "advertiser_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "create_digital_avatar_video_task",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      }
+    },
+    "expected": {
+      "method": "POST",
+      "path": "creative/digital_avatar/video/task/create/",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "get_digital_avatar_video_task",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "task_id": "1234567890"
+    },
+    "expected": {
+      "method": "GET",
+      "path": "creative/digital_avatar/video/task/get/",
+      "query": {
+        "advertiser_id": "1234567890",
+        "task_ids": [
+          "1234567890"
+        ]
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_digital_avatar_videos",
+    "kwargs": {
+      "advertiser_id": "1234567890"
+    },
+    "expected": {
+      "method": "GET",
+      "path": "creative/digital_avatar/video/list/",
+      "query": {
+        "advertiser_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "update_video_file_name",
+    "kwargs": {
+      "avatar_video_id": "1234567890",
+      "file_name": "1234567890"
+    },
+    "expected": {
+      "method": "POST",
+      "path": "file/video/ad/update/",
+      "query": {},
+      "body": {
+        "avatar_video_id": "1234567890",
+        "file_name": "1234567890"
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_store_products",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "bc_id": "1234567890",
+      "store_id": "1234567890"
+    },
+    "expected": {
+      "method": "GET",
+      "path": "store/product/get/",
+      "query": {
+        "advertiser_id": "1234567890",
+        "bc_id": "1234567890",
+        "store_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_gmv_max_custom_anchor_videos",
+    "kwargs": {
+      "payload": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      }
+    },
+    "expected": {
+      "method": "POST",
+      "path": "gmv_max/creation/custom_anchor_video_list/get/",
+      "query": {},
+      "body": {
+        "advertiser_id": "1234567890",
+        "new_field": {
+          "enabled": false,
+          "items": []
+        }
+      },
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_gmv_max_videos",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "store_id": "1234567890",
+      "store_authorized_bc_id": "1234567890"
+    },
+    "expected": {
+      "method": "GET",
+      "path": "gmv_max/video/get/",
+      "query": {
+        "advertiser_id": "1234567890",
+        "store_id": "1234567890",
+        "store_authorized_bc_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "integrated_report",
+    "kwargs": {
+      "report_type": "1234567890"
+    },
+    "expected": {
+      "method": "GET",
+      "path": "report/integrated/get/",
+      "query": {
+        "report_type": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "get_identity_video_info",
+    "kwargs": {
+      "advertiser_id": "1234567890",
+      "identity_type": "1234567890",
+      "identity_id": "1234567890"
+    },
+    "expected": {
+      "method": "GET",
+      "path": "identity/video/info/",
+      "query": {
+        "advertiser_id": "1234567890",
+        "identity_type": "1234567890",
+        "identity_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  },
+  {
+    "client_method": "list_pages",
+    "kwargs": {
+      "advertiser_id": "1234567890"
+    },
+    "expected": {
+      "method": "GET",
+      "path": "page/get/",
+      "query": {
+        "advertiser_id": "1234567890"
+      },
+      "body": null,
+      "form": {},
+      "files": []
+    }
+  }
+]

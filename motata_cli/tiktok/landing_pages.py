@@ -8,7 +8,7 @@ from typing import Any, Callable
 from urllib.parse import parse_qsl, unquote, urlencode, urlparse, urlunparse
 
 from motata_cli.common.errors import CliError
-from motata_cli.common.output import error_kind, request_with_retry, pagination
+from motata_cli.common.output import error_kind, pagination
 from motata_cli.common.output import finalize, unsupported_metrics
 
 
@@ -523,7 +523,7 @@ def _report_rows(
         mode = _report_metrics_mode(candidate_metrics, requested_metrics)
         try:
             for page in range(1, max_pages + 1):
-                response = request_with_retry(client.integrated_report,
+                response = client.integrated_report(
                     "BASIC",
                     advertiser_id=advertiser_id,
                     data_level="AUCTION_AD",

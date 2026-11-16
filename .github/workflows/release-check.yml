@@ -1,8 +1,15 @@
 name: Offline release verification
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 jobs:
+  gateway:
+    uses: ./.github/workflows/gateway-verification.yml
   verify:
     runs-on: ubuntu-latest
     strategy:
@@ -30,6 +37,7 @@ jobs:
           # Keep the host UID mapping: remapping only root makes runner-owned
           # checkout directories inaccessible inside a separate user namespace.
           sudo unshare --net env PATH="$PATH" MOTATA_SUPPRESS_SKILLS_NOTICE=1 "$pythonLocation/bin/python" scripts/run_offline_tests.py
+          sudo unshare --net env PATH="$PATH" "$pythonLocation/bin/python" scripts/check_tiktok_http.py
           sudo unshare --net env PYTHONDONTWRITEBYTECODE=1 "$pythonLocation/bin/python" scripts/build_skill_registry.py
           sudo unshare --net env PATH="$PATH" node --test tests/runtime.test.js tests/runtime-lock.test.js
           sudo unshare --net env PATH="$PATH" PIP_NO_INDEX=1 "$pythonLocation/bin/python" scripts/check_release.py --wheelhouse /tmp/motata-wheelhouse
@@ -52,3 +60,32 @@ jobs:
         run: python scripts/run_offline_tests.py
       - name: Node runtime regression
         run: node --test tests/runtime.test.js tests/runtime-lock.test.js
+  npm12:
+    name: npm 12 default installation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.22.3'
+          package-manager-cache: false
+      - name: Provision npm and Python dependencies
+        run: |
+          npm install --global npm@12.2.2
+          python -m pip install -r requirements-release.txt
+          python -m pip download --only-binary=:all: --dest /tmp/motata-wheelhouse -r requirements-release.txt
+      - name: Build, audit and accept the release artifact offline
+        run: |
+          sudo unshare --net env PATH="$PATH" "$pythonLocation/bin/python" scripts/check_release.py --wheelhouse /tmp/motata-wheelhouse --artifact-dir dist/release
+          sudo unshare --net env PATH="$PATH" "$pythonLocation/bin/python" scripts/check_npm12_install.py --tarball "dist/release/motata-$(node -p "require('./package.json').version").tgz" --version "$(node -p "require('./package.json').version")" --wheelhouse /tmp/motata-wheelhouse
+      - uses: actions/upload-artifact@v4
+        with:
+          name: motata-npm-release
+          path: dist/release/
+          if-no-files-found: error
+          retention-days: 14

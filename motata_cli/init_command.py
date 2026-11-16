@@ -280,16 +280,24 @@ def resolve_access_token(
         return resolve_direct_token(args, settings, ui)
 
     api_key = resolve_auth_center_api_key(args, ui)
+    if settings.name == "tiktok":
+        from motata_cli.auth_center.provider import resolve_tiktok_credential, DEFAULT_BASE_URL
+        base_url = getattr(args, "auth_center_base_url", None) or os.getenv("AUTH_CENTER_BASE_URL") or DEFAULT_BASE_URL
+        credential, _ = resolve_tiktok_credential(account_id=account_id, token_source="auth-center",
+                                                 api_key=api_key, base_url=base_url,
+                                                 header_mode=getattr(args, "auth_center_header", "x-api-key"))
+        return credential, {"source": "auth-center", "base_url": base_url,
+                            "header": getattr(args, "auth_center_header", "x-api-key")}
     access_token, metadata = fetch_auth_center_token_for_init(
         settings=settings,
         account_id=account_id,
         api_key=api_key,
-        base_url=getattr(args, "auth_center_base_url", None) or os.getenv("AUTH_CENTER_BASE_URL", "http://localhost:8000"),
+        base_url=getattr(args, "auth_center_base_url", None) or os.getenv("AUTH_CENTER_BASE_URL", "https://motata.one"),
         header_mode=getattr(args, "auth_center_header", "x-api-key"),
         ui=ui,
     )
     metadata["api_key_env_checked"] = list(AUTH_CENTER_ENV_VARS)
-    metadata["base_url"] = getattr(args, "auth_center_base_url", None) or os.getenv("AUTH_CENTER_BASE_URL", "http://localhost:8000")
+    metadata["base_url"] = getattr(args, "auth_center_base_url", None) or os.getenv("AUTH_CENTER_BASE_URL", "https://motata.one")
     return access_token, metadata
 
 
@@ -576,6 +584,7 @@ def persist_init_summary(
     metrics: list[str],
     metrics_metadata: dict[str, Any],
     report_command: str,
+    token_metadata: dict[str, Any] | None = None,
 ) -> str:
     account_id = account_ids[0]
     account_row = account_rows[0] if account_rows else None
@@ -606,6 +615,9 @@ def persist_init_summary(
         "metric_preset": metrics_metadata.get("preset_name"),
         "suggested_daily_report": report_command,
     }
+    if token_source == "auth-center" and token_metadata:
+        init_profiles[settings.name]["auth_center_base_url"] = token_metadata.get("base_url")
+        init_profiles[settings.name]["auth_center_header"] = token_metadata.get("header", "x-api-key")
     save_config(config)
     return str(CACHE_DIR / "config.json")
 
@@ -651,6 +663,7 @@ def command_init(args: argparse.Namespace) -> None:
         metrics=metrics,
         metrics_metadata=metric_metadata,
         report_command=report_command,
+        token_metadata=token_metadata,
     )
 
     completion_banner = ui.text("setup_complete")
@@ -711,7 +724,7 @@ def register_init_command(subparsers) -> None:
     parser.add_argument("--lang", choices=["auto", "zh", "en"], default="auto", help="Interactive language for prompts and progress text.")
     parser.add_argument("--access-token")
     parser.add_argument("--auth-center-api-key", default=os.getenv("AUTH_CENTER_API_KEY"))
-    parser.add_argument("--auth-center-base-url", default=os.getenv("AUTH_CENTER_BASE_URL", "http://localhost:8000"))
+    parser.add_argument("--auth-center-base-url", default=os.getenv("AUTH_CENTER_BASE_URL", "https://motata.one"))
     parser.add_argument("--auth-center-header", choices=["x-api-key", "bearer"], default="x-api-key")
     parser.add_argument(
         "--account-id",

@@ -55,7 +55,7 @@ def network_exits() -> list[dict]:
                 continue
             name = ast.unparse(node.func)
             network = (name.startswith(('requests.', 'urllib.request.', 'httpx.'))
-                       or name in ('getattr(requests, method)', 'self._invoke')
+                       or name in ('getattr(requests, method)', 'self.session.request')
                        or name.startswith('self.api_client.') and name.endswith(('request', 'call_api')))
             if not network or name.endswith(('RequestException', 'Timeout', 'ConnectionError', 'Request')):
                 continue
@@ -69,9 +69,6 @@ def network_exits() -> list[dict]:
                 kind = 'public_no_platform_credential'
             rows.append({'file': rel, 'line': node.lineno, 'function': function,
                          'call': name, 'classification': kind, 'coverage': 'not_migrated'})
-    rows.append({'file': 'motata_cli/_vendor/tiktok_business_api_sdk/python_sdk/business_api_client/api_client.py',
-                 'line': 1, 'function': 'ApiClient.request', 'call': 'vendored_sdk_transport',
-                 'classification': 'platform_authenticated', 'coverage': 'not_migrated'})
     return sorted(rows, key=lambda r: (r['file'], r['line'], r['call']))
 
 

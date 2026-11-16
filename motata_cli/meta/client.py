@@ -69,18 +69,18 @@ class MetaClient:
 
     def _request(self, method: str, url: str, **kwargs) -> dict[str, Any]:
         if self.gateway is not None:
-            if kwargs.get("files"):
-                raise CliError("GATEWAY_OPERATION_UNAVAILABLE: media transport is not migrated yet.")
             if url.startswith("motata-page:"):
                 path = url
             elif url.startswith(self.base + "/"):
                 path = url[len(self.base) + 1:]
             else:
                 raise CliError("Gateway pagination target is invalid.")
-            envelope = self.gateway.request(auth=self.auth_ref, method=method.upper(), path=path,
+            send = self.gateway.upload if kwargs.get('files') else self.gateway.request
+            envelope = send(auth=self.auth_ref, method=method.upper(), path=path,
                                             query=kwargs.get("params"), body=kwargs.get("data"),
                                             body_encoding="form",
-                                            idempotency_key=os.getenv("MOTATA_GATEWAY_IDEMPOTENCY_KEY") if method != "get" else None)
+                                            idempotency_key=os.getenv("MOTATA_GATEWAY_IDEMPOTENCY_KEY") if method != "get" else None,
+                                            **({'files': kwargs['files']} if kwargs.get('files') else {}))
             response = requests.Response()
             response.status_code = envelope["status"]
             response._content = json.dumps(envelope["data"]).encode()

@@ -138,7 +138,8 @@ def infer_campaign_copy_strategy(
     ) or any(((ad.get("ad_configuration") or {}).get("product_ids") or []) for ad in source_ads)
 
     used_fallback_campaign_budget = False
-    if smart_plus and (
+    is_minis = source_campaign.get("app_promotion_type") == "MINIS"
+    if smart_plus and not is_minis and (
         effective_budget is None
         or str(requested_budget_mode or "").upper() == "BUDGET_MODE_INFINITE"
     ):
@@ -147,16 +148,18 @@ def infer_campaign_copy_strategy(
         effective_budget = max(fallback_budget, 20.0)
         used_fallback_campaign_budget = True
 
-    force_explicit_ad_schedule = smart_plus and effective_budget_mode == "BUDGET_MODE_TOTAL"
+    force_explicit_ad_schedule = smart_plus and not is_minis and effective_budget_mode == "BUDGET_MODE_TOTAL"
     drop_adgroup_budget_controls = smart_plus and (
-        force_explicit_ad_schedule
-        or any(str(adgroup.get("budget_mode") or "").startswith("BUDGET_MODE_DYNAMIC") for adgroup in source_adgroups)
+        (is_minis and source_campaign.get("budget_optimize_on", True))
+        or (not is_minis and (force_explicit_ad_schedule
+        or any(str(adgroup.get("budget_mode") or "").startswith("BUDGET_MODE_DYNAMIC") for adgroup in source_adgroups)))
     )
     source_is_advanced_dedicated = bool(source_campaign.get("is_advanced_dedicated_campaign"))
-    target_smart_plus = smart_plus and source_is_advanced_dedicated
+    target_smart_plus = smart_plus and (source_is_advanced_dedicated or source_campaign.get("app_promotion_type") == "MINIS")
 
     return {
         "smart_plus": smart_plus,
+        "is_minis": is_minis,
         "target_smart_plus": target_smart_plus,
         "campaign_automation_type": automation_type,
         "has_catalog_assets": has_catalog_assets,
@@ -180,7 +183,7 @@ def normalize_smartplus_app_campaign_payload(
     objective_type = str(normalized.get("objective_type") or "").upper()
     app_promotion_type = str(normalized.get("app_promotion_type") or "").upper()
 
-    if objective_type == "APP_PROMOTION":
+    if objective_type == "APP_PROMOTION" and app_promotion_type != "MINIS":
         # The upgraded Smart+ create endpoint expects iOS app promotion campaigns to be created
         # as advanced dedicated campaigns, and it rejects the generic REGULAR_CAMPAIGN mapping.
         normalized["is_advanced_dedicated_campaign"] = True
@@ -240,10 +243,12 @@ def infer_adgroup_copy_strategy(
     force_explicit_ad_schedule = bool(campaign_strategy.get("force_explicit_ad_schedule"))
     drop_budget_controls = smart_plus and (
         bool(campaign_strategy.get("drop_adgroup_budget_controls"))
-        or budget_mode.startswith("BUDGET_MODE_DYNAMIC")
+        or (not campaign_strategy.get("is_minis") and budget_mode.startswith("BUDGET_MODE_DYNAMIC"))
     )
     return {
         "smart_plus": smart_plus,
+        "target_smart_plus": bool(campaign_strategy.get("target_smart_plus")),
+        "is_minis": bool(campaign_strategy.get("is_minis")),
         "automation_type": automation_type,
         "has_catalog_assets": has_catalog_assets,
         "force_explicit_ad_schedule": force_explicit_ad_schedule,
@@ -324,6 +329,7 @@ def build_campaign_copy_payload(
             "campaign_type": source_campaign.get("campaign_type"),
             "postback_window_mode": source_campaign.get("postback_window_mode"),
             "app_promotion_type": source_campaign.get("app_promotion_type"),
+            "minis_id": source_campaign.get("minis_id"),
             "disable_skan_campaign": source_campaign.get("disable_skan_campaign"),
             "campaign_app_profile_page_state": source_campaign.get("campaign_app_profile_page_state"),
             "page_id": page_id,
@@ -333,6 +339,12 @@ def build_campaign_copy_payload(
         payload["catalog_enabled"] = True
         deps.assign_if_present(payload, "catalog_type", copy_strategy.get("catalog_type"))
         deps.assign_if_present(payload, "smart_plus_adgroup_mode", copy_strategy.get("smart_plus_adgroup_mode"))
+    if payload.get("app_promotion_type") == "MINIS":
+        for key in ("app_id", "campaign_app_profile_page_state", "disable_skan_campaign", "postback_window_mode"):
+            payload.pop(key, None)
+        payload["catalog_enabled"] = bool(source_campaign.get("catalog_enabled", False))
+        if payload.get("budget_mode") == "BUDGET_MODE_INFINITE":
+            payload.pop("budget", None)
     special_industries = source_campaign.get("special_industries")
     if isinstance(special_industries, list) and special_industries:
         payload["special_industries"] = special_industries
@@ -361,24 +373,37 @@ def build_adgroup_copy_payload(
         "adgroup_name": source_adgroup.get("adgroup_name"),
         "operation_status": operation_status or source_adgroup.get("operation_status") or "DISABLE",
     }
-    for key in deps.ADGROUP_COPY_DIRECT_FIELDS:
+    for key in (*deps.ADGROUP_COPY_DIRECT_FIELDS, "native_series_id", "drama_selling_setting", "minis_id",
+                "identity_id", "identity_type", "identity_authorized_bc_id", "deep_bid_type", "vbo_window",
+                "tiktok_subplacements", "dayparting"):
         if key in source_adgroup:
             payload[key] = source_adgroup.get(key)
     targeting_spec = source_adgroup.get("targeting_spec")
-    if isinstance(targeting_spec, dict) and targeting_spec:
-        if adgroup_strategy.get("target_smart_plus"):
-            payload["targeting_spec"] = targeting_spec
-        else:
-            payload.update(targeting_spec)
+    if adgroup_strategy.get("target_smart_plus"):
+        from motata_cli.tiktok.smartplus_adgroup_update import TARGET_FIELDS
+        targeting = {key: source_adgroup[key] for key in sorted(TARGET_FIELDS) if key in source_adgroup}
+        if isinstance(targeting_spec, dict):
+            targeting.update(targeting_spec)
+        if targeting:
+            payload["targeting_spec"] = targeting
+        for key in TARGET_FIELDS:
+            payload.pop(key, None)
+    elif isinstance(targeting_spec, dict) and targeting_spec:
+        payload.update(targeting_spec)
     else:
         for key in deps.ADGROUP_COPY_FALLBACK_TARGETING_FIELDS:
             if key in source_adgroup:
-                payload[key] = source_adgroup.get(key)
+                payload[key] = source_adgroup[key]
     if adgroup_strategy.get("target_smart_plus") and adgroup_strategy.get("drop_budget_controls"):
         payload.pop("budget", None)
         payload.pop("budget_mode", None)
     if adgroup_strategy.get("target_smart_plus") and adgroup_strategy.get("force_explicit_ad_schedule"):
         payload["schedule_type"] = "SCHEDULE_START_END"
+    if payload.get("promotion_type") == "NATIVE_SERIES":
+        for key in ("bid_price", "conversion_bid_price", "click_attribution_window", "app_id"):
+            payload.pop(key, None)
+        if payload.get("optimization_event") == "IMPRESSION_LEVEL_AD_REVENUE":
+            payload["optimization_event"] = "AD_REVENUE_VALUE"
     if adgroup_strategy.get("smart_plus") and (
         adgroup_strategy.get("has_catalog_assets") or source_adgroup.get("product_source") == "CATALOG"
     ):

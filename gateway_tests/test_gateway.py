@@ -516,12 +516,12 @@ class CLIIntegrationTests(GatewayTests):
         self.assertEqual(len(self.seen), 1)
         self.assertIn(b'PAUSED', self.seen[0].content)
 
-    async def test_cli_tiktok_list_avoids_sdk_token_runtime(self):
-        self.reply = {'code': 0, 'data': {'list': [{'campaign_id': '456', 'campaign_name': 'test'}]}}
+    async def test_cli_tiktok_gateway_mode_is_rejected_without_upstream(self):
         code, output, error = await self.run_cli(['tiktok', 'campaigns', 'list', '--advertiser-id', '123'])
-        self.assertEqual(code, 0, error)
-        self.assertIn('456', output)
-        self.assertEqual(len(self.seen), 1)
+        self.assertEqual(code, 2, error)
+        self.assertIn('Direct HTTP only', error)
+        self.assertIn('will not fall back', error)
+        self.assert_no_upstream()
 
     async def test_cli_unmigrated_command_fails_closed(self):
         code, output, error = await self.run_cli(['report', 'meta', 'run', '--period', 'daily'])

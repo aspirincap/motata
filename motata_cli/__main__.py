@@ -25,6 +25,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="motata", description="Motata CLI")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=True)
+    from motata_cli.capabilities import register as register_capabilities
+    register_capabilities(subparsers)
     register_init_command(subparsers)
     register_product_commands(subparsers)
     register_meta_commands(subparsers)

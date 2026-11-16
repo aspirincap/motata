@@ -1,0 +1,1475 @@
+{
+  "schema_version": 1,
+  "api_version": "v1.3",
+  "baseline_head": "1709e4b",
+  "baseline_tests": {
+    "run": 339,
+    "result": "passed"
+  },
+  "public_methods": [
+    "create_changelog_task",
+    "check_changelog_task",
+    "download_changelog_task",
+    "list_business_centers",
+    "list_bc_assets",
+    "list_campaigns",
+    "list_gmv_max_campaigns",
+    "get_gmv_max_campaign",
+    "get_campaign",
+    "create_campaign",
+    "update_campaign",
+    "update_campaign_status",
+    "list_adgroups",
+    "get_adgroup",
+    "create_adgroup",
+    "update_adgroup",
+    "update_adgroup_status",
+    "list_ads",
+    "get_ad",
+    "create_ad",
+    "update_ad",
+    "update_ad_status",
+    "upload_image",
+    "upload_video",
+    "get_image_info",
+    "get_video_info",
+    "list_tt_videos",
+    "search_videos",
+    "delete_assets",
+    "share_assets",
+    "get_account_info",
+    "oauth2_advertiser_get",
+    "update_account",
+    "list_pixels",
+    "list_offline_event_sets",
+    "list_apps",
+    "get_app_info",
+    "list_pages",
+    "list_aigc_voices",
+    "create_image_animation_task",
+    "create_aigc_video_task",
+    "list_aigc_video_tasks",
+    "list_aigc_videos",
+    "list_digital_avatars",
+    "create_digital_avatar_video_task",
+    "get_digital_avatar_video_task",
+    "list_digital_avatar_videos",
+    "update_video_file_name",
+    "list_app_optimization_events",
+    "list_catalogs",
+    "get_catalog_eventsource_bindings",
+    "list_stores",
+    "list_store_products",
+    "gmv_max_report",
+    "list_gmv_max_custom_anchor_videos",
+    "list_gmv_max_videos",
+    "search_regions",
+    "targeting_search",
+    "targeting_info",
+    "targeting_list",
+    "validate_url",
+    "get_vbo_status",
+    "integrated_report",
+    "smart_plus_material_report_overview",
+    "smart_plus_material_report_breakdown",
+    "list_identities",
+    "create_identity",
+    "get_identity_video_info",
+    "list_creative_portfolios",
+    "get_creative_portfolio",
+    "create_creative_portfolio",
+    "create_shareable_link",
+    "generate_smart_text",
+    "close"
+  ],
+  "sdk_operations": [
+    {
+      "endpoint_id": "creative_asset_delete",
+      "method": "POST",
+      "path": "creative/asset/delete/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1797202997456897",
+      "source_sha256": "1faebc45f3335606ab6d1711962ab7cd0707d8906b6a27121f840ef86a797d1a",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "creative_asset_share",
+      "method": "POST",
+      "path": "creative/asset/share/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1773192725768193",
+      "source_sha256": "1faebc45f3335606ab6d1711962ab7cd0707d8906b6a27121f840ef86a797d1a",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "creative_portfolio_create",
+      "method": "POST",
+      "path": "creative/portfolio/create/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1739091950439426",
+      "source_sha256": "106e7489a0b46b5497047c432e3fc937dad3be50b4a3aa6077ae30e905715346",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "creative_portfolio_get",
+      "method": "GET",
+      "path": "creative/portfolio/get/",
+      "positional": [
+        "advertiser_id",
+        "creative_portfolio_id",
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_id",
+        "creative_portfolio_id"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1739092113671170",
+      "source_sha256": "1faebc45f3335606ab6d1711962ab7cd0707d8906b6a27121f840ef86a797d1a",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "creative_portfolio_list",
+      "method": "GET",
+      "path": "creative/portfolio/list/",
+      "positional": [
+        "advertiser_id",
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_id",
+        "filtering",
+        "page",
+        "page_size"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1766324010279938",
+      "source_sha256": "1faebc45f3335606ab6d1711962ab7cd0707d8906b6a27121f840ef86a797d1a",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "creative_shareable_link_create",
+      "method": "POST",
+      "path": "creative/shareable_link/create/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1738373164380162",
+      "source_sha256": "1faebc45f3335606ab6d1711962ab7cd0707d8906b6a27121f840ef86a797d1a",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "creative_smart_text_generate",
+      "method": "POST",
+      "path": "creative/smart_text/generate/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1739084248002626",
+      "source_sha256": "1faebc45f3335606ab6d1711962ab7cd0707d8906b6a27121f840ef86a797d1a",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "adgroup_create",
+      "method": "POST",
+      "path": "adgroup/create/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1739499616346114",
+      "source_sha256": "b59ccd20451a0c58d5e9dc2f0b25233ae6713d79dc383fd3b7efd9824e3e825b",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "adgroup_status_update",
+      "method": "POST",
+      "path": "adgroup/status/update/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1739591716326402",
+      "source_sha256": "b59ccd20451a0c58d5e9dc2f0b25233ae6713d79dc383fd3b7efd9824e3e825b",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "adgroup_update",
+      "method": "POST",
+      "path": "adgroup/update/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1739586761631745",
+      "source_sha256": "b59ccd20451a0c58d5e9dc2f0b25233ae6713d79dc383fd3b7efd9824e3e825b",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "smart_plus_adgroup_create",
+      "method": "POST",
+      "path": "smart_plus/adgroup/create/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1738373164380162",
+      "source_sha256": "b59ccd20451a0c58d5e9dc2f0b25233ae6713d79dc383fd3b7efd9824e3e825b",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "smart_plus_adgroup_status_update",
+      "method": "POST",
+      "path": "smart_plus/adgroup/status/update/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1738373164380162",
+      "source_sha256": "b59ccd20451a0c58d5e9dc2f0b25233ae6713d79dc383fd3b7efd9824e3e825b",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "smart_plus_adgroup_update",
+      "method": "POST",
+      "path": "smart_plus/adgroup/update/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1738373164380162",
+      "source_sha256": "b59ccd20451a0c58d5e9dc2f0b25233ae6713d79dc383fd3b7efd9824e3e825b",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "app_info",
+      "method": "GET",
+      "path": "app/info/",
+      "positional": [
+        "advertiser_id",
+        "app_id",
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_id",
+        "app_id"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1740859272887297",
+      "source_sha256": "7ca2fc869143059fa3a67b222561d2773b7a26a24e06caf2fba6ec8620e3599a",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "app_list",
+      "method": "GET",
+      "path": "app/list/",
+      "positional": [
+        "advertiser_id",
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_id",
+        "app_platform_ids"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1740859313270786",
+      "source_sha256": "7ca2fc869143059fa3a67b222561d2773b7a26a24e06caf2fba6ec8620e3599a",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "app_optimization_event",
+      "method": "GET",
+      "path": "app/optimization_event/",
+      "positional": [
+        "app_id",
+        "advertiser_id",
+        "optimization_goal",
+        "access_token"
+      ],
+      "query_fields": [
+        "app_id",
+        "advertiser_id",
+        "placement",
+        "placement_type",
+        "optimization_goal",
+        "objective",
+        "available_only",
+        "is_skan",
+        "app_promotion_type"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1740859338750977",
+      "source_sha256": "7ca2fc869143059fa3a67b222561d2773b7a26a24e06caf2fba6ec8620e3599a",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "gmv_max_report_get",
+      "method": "GET",
+      "path": "gmv_max/report/get/",
+      "positional": [
+        "advertiser_id",
+        "store_ids",
+        "dimensions",
+        "metrics",
+        "start_date",
+        "end_date",
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_id",
+        "store_ids",
+        "dimensions",
+        "metrics",
+        "enable_total_metrics",
+        "start_date",
+        "end_date",
+        "filtering",
+        "sort_field",
+        "sort_type",
+        "page",
+        "page_size",
+        "context_info"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1824721673497601",
+      "source_sha256": "af8a1b54e660e38553d45d1b6ac3f27c39216ecdc8bd454d5b40de45bc3ac286",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "smart_plus_material_report_breakdown",
+      "method": "GET",
+      "path": "smart_plus/material_report/breakdown/",
+      "positional": [
+        "advertiser_id",
+        "dimensions",
+        "start_date",
+        "end_date",
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_id",
+        "dimensions",
+        "metrics",
+        "start_date",
+        "end_date",
+        "filtering",
+        "sort_field",
+        "sort_type",
+        "page",
+        "page_size"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1738373164380162",
+      "source_sha256": "af8a1b54e660e38553d45d1b6ac3f27c39216ecdc8bd454d5b40de45bc3ac286",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "smart_plus_material_report_overview",
+      "method": "GET",
+      "path": "smart_plus/material_report/overview/",
+      "positional": [
+        "advertiser_id",
+        "dimensions",
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_id",
+        "dimensions",
+        "metrics",
+        "start_date",
+        "end_date",
+        "query_lifetime",
+        "filtering",
+        "sort_field",
+        "sort_type",
+        "page",
+        "page_size"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1738373164380162",
+      "source_sha256": "af8a1b54e660e38553d45d1b6ac3f27c39216ecdc8bd454d5b40de45bc3ac286",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "catalog_eventsource_bind_get",
+      "method": "GET",
+      "path": "catalog/eventsource_bind/get/",
+      "positional": [
+        "catalog_id",
+        "bc_id",
+        "access_token"
+      ],
+      "query_fields": [
+        "catalog_id",
+        "bc_id"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1740492531343362",
+      "source_sha256": "05aed69bf05bfe01351e268a116ecc125c864a578708a6cfc3452fb0f4039e12",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "catalog_get",
+      "method": "GET",
+      "path": "catalog/get/",
+      "positional": [
+        "bc_id",
+        "access_token"
+      ],
+      "query_fields": [
+        "catalog_id",
+        "bc_id",
+        "page",
+        "page_size"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1740315452868610",
+      "source_sha256": "05aed69bf05bfe01351e268a116ecc125c864a578708a6cfc3452fb0f4039e12",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "oauth2_advertiser_get",
+      "method": "GET",
+      "path": "oauth2/advertiser/get/",
+      "positional": [
+        "app_id",
+        "secret",
+        "access_token"
+      ],
+      "query_fields": [
+        "app_id",
+        "secret"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1738455508553729",
+      "source_sha256": "67b1171bd3adad9d72e4ddd2b4f90ecdf5248923c267c8e1c77ec9c2e12dcec9",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "ad_image_upload",
+      "method": "POST",
+      "path": "file/image/ad/upload/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [
+        "advertiser_id",
+        "file_id",
+        "file_name",
+        "image_signature",
+        "image_url",
+        "upload_type"
+      ],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1739067433456642",
+      "source_sha256": "8c98165bec8f2726fc36da01a93c9320d93d4077110f78eb3bae86caaa588b70",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "ad_video_search",
+      "method": "GET",
+      "path": "file/video/ad/search/",
+      "positional": [
+        "advertiser_id",
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_id",
+        "filtering",
+        "page",
+        "page_size"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1738373164380162",
+      "source_sha256": "8c98165bec8f2726fc36da01a93c9320d93d4077110f78eb3bae86caaa588b70",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "ad_video_upload",
+      "method": "POST",
+      "path": "file/video/ad/upload/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [
+        "advertiser_id",
+        "auto_bind_enabled",
+        "auto_fix_enabled",
+        "file_id",
+        "file_name",
+        "flaw_detect",
+        "is_third_party",
+        "upload_type",
+        "video_id",
+        "video_signature",
+        "video_url"
+      ],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1737587322856449",
+      "source_sha256": "8c98165bec8f2726fc36da01a93c9320d93d4077110f78eb3bae86caaa588b70",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "offline_get",
+      "method": "GET",
+      "path": "offline/get/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_id",
+        "event_set_ids",
+        "name"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1765596808589313",
+      "source_sha256": "c3df28e0326038f0c530e6e190bbbd1e6ccb69cae2714dac1fdcec633aae10d4",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "pixel_list",
+      "method": "GET",
+      "path": "pixel/list/",
+      "positional": [
+        "advertiser_id",
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_id",
+        "pixel_id",
+        "code",
+        "name",
+        "order_by",
+        "filtering",
+        "page",
+        "page_size"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1740858697598978",
+      "source_sha256": "c3df28e0326038f0c530e6e190bbbd1e6ccb69cae2714dac1fdcec633aae10d4",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "campaign_create",
+      "method": "POST",
+      "path": "campaign/create/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1739318962329602",
+      "source_sha256": "c07eaed68681fe87fe8dd39086b626f5e51ac9605873061ac9647616aa78d3ec",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "campaign_gmv_max_info",
+      "method": "GET",
+      "path": "campaign/gmv_max/info/",
+      "positional": [
+        "advertiser_id",
+        "campaign_id",
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_id",
+        "campaign_id"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1822000968821762",
+      "source_sha256": "c07eaed68681fe87fe8dd39086b626f5e51ac9605873061ac9647616aa78d3ec",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "campaign_status_update",
+      "method": "POST",
+      "path": "campaign/status/update/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1739320994354178",
+      "source_sha256": "c07eaed68681fe87fe8dd39086b626f5e51ac9605873061ac9647616aa78d3ec",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "campaign_update",
+      "method": "POST",
+      "path": "campaign/update/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1739320422086657",
+      "source_sha256": "c07eaed68681fe87fe8dd39086b626f5e51ac9605873061ac9647616aa78d3ec",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "smart_plus_campaign_create",
+      "method": "POST",
+      "path": "smart_plus/campaign/create/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1738373164380162",
+      "source_sha256": "c07eaed68681fe87fe8dd39086b626f5e51ac9605873061ac9647616aa78d3ec",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "smart_plus_campaign_status_update",
+      "method": "POST",
+      "path": "smart_plus/campaign/status/update/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1738373164380162",
+      "source_sha256": "c07eaed68681fe87fe8dd39086b626f5e51ac9605873061ac9647616aa78d3ec",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "smart_plus_campaign_update",
+      "method": "POST",
+      "path": "smart_plus/campaign/update/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1738373164380162",
+      "source_sha256": "c07eaed68681fe87fe8dd39086b626f5e51ac9605873061ac9647616aa78d3ec",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "advertiser_update",
+      "method": "POST",
+      "path": "advertiser/update/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1739939050770434",
+      "source_sha256": "46b339e4241bcc494ba48e2c1aba4d6b3283b93c850e13a4f6ae46762a73c56e",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "ad_create",
+      "method": "POST",
+      "path": "ad/create/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1739953377508354",
+      "source_sha256": "1e5f0714a863ecf24336072d02fc792a5757e6dd61f553a95fc6fd84c51af91b",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "ad_status_update",
+      "method": "POST",
+      "path": "ad/status/update/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1739953422970882",
+      "source_sha256": "1e5f0714a863ecf24336072d02fc792a5757e6dd61f553a95fc6fd84c51af91b",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "ad_update",
+      "method": "POST",
+      "path": "ad/update/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1739953405142018",
+      "source_sha256": "1e5f0714a863ecf24336072d02fc792a5757e6dd61f553a95fc6fd84c51af91b",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "smart_plus_ad_create",
+      "method": "POST",
+      "path": "smart_plus/ad/create/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1738373164380162",
+      "source_sha256": "1e5f0714a863ecf24336072d02fc792a5757e6dd61f553a95fc6fd84c51af91b",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "smart_plus_ad_status_update",
+      "method": "POST",
+      "path": "smart_plus/ad/status/update/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1738373164380162",
+      "source_sha256": "1e5f0714a863ecf24336072d02fc792a5757e6dd61f553a95fc6fd84c51af91b",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "smart_plus_ad_update",
+      "method": "POST",
+      "path": "smart_plus/ad/update/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1738373164380162",
+      "source_sha256": "1e5f0714a863ecf24336072d02fc792a5757e6dd61f553a95fc6fd84c51af91b",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "identity_create",
+      "method": "POST",
+      "path": "identity/create/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?rid=uraumvplog&id=1740654203526146",
+      "source_sha256": "4e756321275d033c8cfeba50da284ec4c94c2d0050558d4ebcde02b0a3e54d05",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "identity_get",
+      "method": "GET",
+      "path": "identity/get/",
+      "positional": [
+        "advertiser_id",
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_id",
+        "identity_type",
+        "identity_authorized_bc_id",
+        "page",
+        "page_size"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?rid=uraumvplog&id=1740218420781057",
+      "source_sha256": "4e756321275d033c8cfeba50da284ec4c94c2d0050558d4ebcde02b0a3e54d05",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "read_only_smoke_passed"
+    },
+    {
+      "endpoint_id": "search_region",
+      "method": "GET",
+      "path": "search/region/",
+      "positional": [
+        "advertiser_id",
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_id",
+        "language"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1773644763581441",
+      "source_sha256": "79fc815baadda7a3e6ea3b2040c5932ca11719ed23968e5164269c1705dcb8b2",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "tool_targeting_info",
+      "method": "POST",
+      "path": "tool/targeting/info/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1761237001980929",
+      "source_sha256": "79fc815baadda7a3e6ea3b2040c5932ca11719ed23968e5164269c1705dcb8b2",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "tool_targeting_list",
+      "method": "GET",
+      "path": "tool/targeting/list/",
+      "positional": [
+        "advertiser_id",
+        "location_ids",
+        "scene",
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_id",
+        "location_ids",
+        "scene"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1762962378261506",
+      "source_sha256": "79fc815baadda7a3e6ea3b2040c5932ca11719ed23968e5164269c1705dcb8b2",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "tool_targeting_search",
+      "method": "POST",
+      "path": "tool/targeting/search/",
+      "positional": [
+        "access_token"
+      ],
+      "query_fields": [],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1761236883355649",
+      "source_sha256": "79fc815baadda7a3e6ea3b2040c5932ca11719ed23968e5164269c1705dcb8b2",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "tool_url_validate",
+      "method": "GET",
+      "path": "tool/url_validate/",
+      "positional": [
+        "advertiser_id",
+        "url",
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_id",
+        "url"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1774487686007810",
+      "source_sha256": "79fc815baadda7a3e6ea3b2040c5932ca11719ed23968e5164269c1705dcb8b2",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "tool_vbo_status",
+      "method": "GET",
+      "path": "tool/vbo_status/",
+      "positional": [
+        "advertiser_id",
+        "objective_type",
+        "promotion_type",
+        "placements",
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_id",
+        "objective_type",
+        "promotion_type",
+        "placements",
+        "pixel_id",
+        "app_id",
+        "optimization_event",
+        "ios14_quota_type",
+        "app_promotion_type",
+        "store_id",
+        "campaign_app_profile_page_state",
+        "is_smart_performance_campaign",
+        "budget_optimize_on",
+        "campaign_type"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://ads.tiktok.com/marketing_api/docs?id=1770016073586753",
+      "source_sha256": "79fc815baadda7a3e6ea3b2040c5932ca11719ed23968e5164269c1705dcb8b2",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "gmv_max_store_list",
+      "method": "GET",
+      "path": "gmv_max/store/list/",
+      "positional": [
+        "advertiser_id",
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_id"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1822001044479041",
+      "source_sha256": "41477293f725f288854fd0464607f79b0d755da514df9dc3ac685e23952a777a",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "advertiser_info",
+      "method": "GET",
+      "path": "advertiser/info/",
+      "positional": [
+        "advertiser_ids",
+        "access_token"
+      ],
+      "query_fields": [
+        "advertiser_ids",
+        "fields"
+      ],
+      "form_fields": [],
+      "token_location": "header",
+      "source": "https://business-api.tiktok.com/portal/docs?id=1739593083610113",
+      "source_sha256": "46b339e4241bcc494ba48e2c1aba4d6b3283b93c850e13a4f6ae46762a73c56e",
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "read_only_smoke_passed"
+    }
+  ],
+  "existing_http": [
+    {
+      "endpoint_id": "changelog_task_create",
+      "path": "changelog/task/create/",
+      "method": "POST",
+      "client_methods": [
+        "create_changelog_task"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "changelog_task_check",
+      "path": "changelog/task/check/",
+      "method": "GET",
+      "client_methods": [
+        "check_changelog_task"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "changelog_task_download",
+      "path": "changelog/task/download/",
+      "method": "GET",
+      "client_methods": [
+        "download_changelog_task"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "bc_get",
+      "path": "bc/get/",
+      "method": "GET",
+      "client_methods": [
+        "list_business_centers"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "bc_asset_get",
+      "path": "bc/asset/get/",
+      "method": "GET",
+      "client_methods": [
+        "list_bc_assets"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "smart_plus_campaign_get",
+      "path": "smart_plus/campaign/get/",
+      "method": "GET",
+      "client_methods": [
+        "list_campaigns"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "read_only_smoke_passed"
+    },
+    {
+      "endpoint_id": "campaign_get",
+      "path": "campaign/get/",
+      "method": "GET",
+      "client_methods": [
+        "list_campaigns"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "read_only_smoke_passed"
+    },
+    {
+      "endpoint_id": "gmv_max_campaign_get",
+      "path": "gmv_max/campaign/get/",
+      "method": "GET",
+      "client_methods": [
+        "list_gmv_max_campaigns"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "smart_plus_adgroup_get",
+      "path": "smart_plus/adgroup/get/",
+      "method": "GET",
+      "client_methods": [
+        "list_adgroups"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "read_only_smoke_passed"
+    },
+    {
+      "endpoint_id": "adgroup_get",
+      "path": "adgroup/get/",
+      "method": "GET",
+      "client_methods": [
+        "list_adgroups"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "smart_plus_ad_get",
+      "path": "smart_plus/ad/get/",
+      "method": "GET",
+      "client_methods": [
+        "list_ads"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "ad_get",
+      "path": "ad/get/",
+      "method": "GET",
+      "client_methods": [
+        "list_ads"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "file_image_ad_upload",
+      "path": "file/image/ad/upload/",
+      "method": "POST",
+      "client_methods": [
+        "upload_image"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "file_image_ad_info",
+      "path": "file/image/ad/info/",
+      "method": "GET",
+      "client_methods": [
+        "get_image_info"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "file_video_ad_info",
+      "path": "file/video/ad/info/",
+      "method": "GET",
+      "client_methods": [
+        "get_video_info"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "tt_video_list",
+      "path": "tt_video/list/",
+      "method": "GET",
+      "client_methods": [
+        "list_tt_videos"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "creative_aigc_voice_get",
+      "path": "creative/aigc/voice/get/",
+      "method": "GET",
+      "client_methods": [
+        "list_aigc_voices"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "creative_aigc_image_animation_task_create",
+      "path": "creative/aigc/image_animation/task/create/",
+      "method": "POST",
+      "client_methods": [
+        "create_image_animation_task"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "creative_aigc_video_task_create",
+      "path": "creative/aigc/video/task/create/",
+      "method": "POST",
+      "client_methods": [
+        "create_aigc_video_task"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "creative_aigc_video_task_list",
+      "path": "creative/aigc/video/task/list/",
+      "method": "GET",
+      "client_methods": [
+        "list_aigc_video_tasks"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "creative_aigc_video_list",
+      "path": "creative/aigc/video/list/",
+      "method": "GET",
+      "client_methods": [
+        "list_aigc_videos"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "creative_digital_avatar_get",
+      "path": "creative/digital_avatar/get/",
+      "method": "GET",
+      "client_methods": [
+        "list_digital_avatars"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "creative_digital_avatar_video_task_create",
+      "path": "creative/digital_avatar/video/task/create/",
+      "method": "POST",
+      "client_methods": [
+        "create_digital_avatar_video_task"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "creative_digital_avatar_video_task_get",
+      "path": "creative/digital_avatar/video/task/get/",
+      "method": "GET",
+      "client_methods": [
+        "get_digital_avatar_video_task"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "creative_digital_avatar_video_list",
+      "path": "creative/digital_avatar/video/list/",
+      "method": "GET",
+      "client_methods": [
+        "list_digital_avatar_videos"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "file_video_ad_update",
+      "path": "file/video/ad/update/",
+      "method": "POST",
+      "client_methods": [
+        "update_video_file_name"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "store_product_get",
+      "path": "store/product/get/",
+      "method": "GET",
+      "client_methods": [
+        "list_store_products"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "gmv_max_creation_custom_anchor_video_list_get",
+      "path": "gmv_max/creation/custom_anchor_video_list/get/",
+      "method": "POST",
+      "client_methods": [
+        "list_gmv_max_custom_anchor_videos"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "gmv_max_video_get",
+      "path": "gmv_max/video/get/",
+      "method": "GET",
+      "client_methods": [
+        "list_gmv_max_videos"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "report_integrated_get",
+      "path": "report/integrated/get/",
+      "method": "GET",
+      "client_methods": [
+        "integrated_report"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "read_only_smoke_passed"
+    },
+    {
+      "endpoint_id": "identity_video_info",
+      "path": "identity/video/info/",
+      "method": "GET",
+      "client_methods": [
+        "get_identity_video_info"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    },
+    {
+      "endpoint_id": "page_get",
+      "path": "page/get/",
+      "method": "GET",
+      "client_methods": [
+        "list_pages"
+      ],
+      "implementation": "direct_http",
+      "offline_request_contract": "passed",
+      "live_validation": "not_verified"
+    }
+  ],
+  "implementation": {
+    "date": "2026-11-12",
+    "candidate_version": "0.3.0",
+    "registered_endpoints": 83,
+    "sdk_dependency": false,
+    "jwt_required": false,
+    "auth_center_contract": "v0.3.9",
+    "auth_center_live_validation": "not_verified_no_api_key",
+    "fixtures": [
+      "tests/fixtures/tiktok_http_contracts.json",
+      "tests/fixtures/tiktok_existing_http_contracts.json"
+    ],
+    "live_record": "docs/tiktok-live-validation.json",
+    "writes_live_validated": false,
+    "new_endpoints": [
+      {
+        "endpoint_id": "identity_native_series_get",
+        "method": "GET",
+        "path": "identity/native_series/get/",
+        "live_validation": "read_only_smoke_passed_empty_series_list"
+      }
+    ],
+    "notes": [
+      "Historical SDK source_sha256 fingerprints local pre-migration code, not a freshly downloaded official document.",
+      "Live read-only checks do not establish advertising eligibility or validate write behavior."
+    ]
+  }
+}

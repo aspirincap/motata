@@ -6,10 +6,12 @@ from typing import Any, Callable
 
 
 def error_kind(exc: Exception) -> str:
+    if getattr(exc, 'category', None):
+        return exc.category
     text = str(exc).lower()
-    if any(x in text for x in ('429', '40108', '40109', 'rate limit', 'too many requests', 'throttl')):
+    if any(x in text for x in ('429', '40100', '40108', '40109', 'rate limit', 'too many requests', 'throttl')):
         return 'rate_limit'
-    if any(x in text for x in ('401', '403', '40001', '40002', '40100', 'unauthorized', 'forbidden', 'access token', 'access_token', 'permission', 'authentication')):
+    if any(x in text for x in ('401', '403', '40001', '40002', 'unauthorized', 'forbidden', 'access token', 'access_token', 'permission', 'authentication')):
         return 'auth'
     if isinstance(exc, (TimeoutError, ConnectionError)) or any(x in text for x in ('timeout', 'timed out', 'connection', '502', '503', '504')):
         return 'network'
@@ -24,7 +26,7 @@ def request_with_retry(fn: Callable[..., Any], *args: Any, **kwargs: Any) -> Any
         try:
             return fn(*args, **kwargs)
         except Exception as exc:
-            if error_kind(exc) not in {'network', 'rate_limit'} or attempt == 2:
+            if getattr(exc, 'retry_managed', False) is True or error_kind(exc) not in {'network', 'rate_limit'} or attempt == 2:
                 raise
             try:
                 wait = float(getattr(exc, 'retry_after', None))

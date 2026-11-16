@@ -51,6 +51,20 @@ class GatewayApp:
                     raise GatewayError('NOT_FOUND', 404, 'Unknown gateway route.')
                 if scope.get('query_string'):
                     raise GatewayError('INVALID_REQUEST', 400, 'URL query parameters are not supported.')
+                if scope['path'] == '/v1/platform/upload':
+                    from .uploads import receive_upload
+                    # Do not allow waiting uploads to hold open unlimited request bodies.
+                    if self.service.scheduler.upload_slots.locked():
+                        raise GatewayError('GATEWAY_BUSY', 503, 'Upload capacity reached; retry later.')
+                    async with self.service.scheduler.upload_slots:
+                        header, stream = await receive_upload(receive, self.service, principal)
+                        try:
+                            request_id = header.request.request_id
+                            response = await self.service.dispatch(header.request, principal, upload=(header, stream))
+                        finally:
+                            stream.close()
+                    await self.respond(send, 200, response)
+                    return
                 if scope['path'].startswith('/v1/pages/'):
                     reference = scope['path'][10:]
                     if not re.fullmatch(r'[A-Za-z0-9_-]{16,64}', reference):

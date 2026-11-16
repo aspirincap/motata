@@ -1,0 +1,58 @@
+{
+  "date": "2026-11-12T08:02:43.005048+00:00",
+  "account_id": "REDACTED",
+  "credential_source": "user_supplied_platform_token",
+  "writes_performed": false,
+  "checks": [
+    {
+      "check": "account",
+      "status": "passed",
+      "code": 0,
+      "request_id": "REDACTED",
+      "rows_on_page": 1
+    },
+    {
+      "check": "campaigns",
+      "status": "passed",
+      "code": 0,
+      "request_id": "REDACTED",
+      "rows_on_page": 1
+    },
+    {
+      "check": "smartplus_campaigns",
+      "status": "passed",
+      "code": 0,
+      "request_id": "REDACTED",
+      "rows_on_page": 1
+    },
+    {
+      "check": "smartplus_adgroups",
+      "status": "passed",
+      "code": 0,
+      "request_id": "REDACTED",
+      "rows_on_page": 1
+    },
+    {
+      "check": "identities",
+      "status": "passed",
+      "code": 0,
+      "request_id": "REDACTED",
+      "rows_on_page": 17
+    },
+    {
+      "check": "integrated_report",
+      "status": "passed",
+      "code": 0,
+      "request_id": "REDACTED",
+      "rows_on_page": 0
+    },
+    {
+      "check": "native_series",
+      "status": "passed",
+      "code": 0,
+      "request_id": "REDACTED",
+      "rows_on_page": 0
+    }
+  ],
+  "redaction": "Public summary: account and platform request IDs removed. Original evidence is retained locally outside version control."
+}

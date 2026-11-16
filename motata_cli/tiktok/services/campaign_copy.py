@@ -4,6 +4,9 @@ Injected collaborators are resolved per invocation to preserve legacy patch poin
 from __future__ import annotations
 import argparse
 import sys
+import uuid
+from motata_cli.tiktok.operations import OperationStore, digest
+from motata_cli.common.errors import CliError
 from typing import Any
 from ..client import TikTokClient
 
@@ -22,6 +25,9 @@ def load_tiktok_campaign_copy_source(client: TikTokClient, *, advertiser_id: str
     source_ads_by_adgroup: dict[str, list[dict[str, Any]]] = {}
     if not skip_adgroups:
         source_adgroups, source_ads_by_adgroup = deps.load_source_adgroups_and_ads_for_copy(client, advertiser_id=advertiser_id, campaign_id=campaign_id, smart_plus=effective_smart_plus, include_ads=not skip_ads)
+    if source_campaign_data.get('app_promotion_type') == 'MINIS' and any(row.get('promotion_type') == 'NATIVE_SERIES' for row in source_adgroups):
+        from motata_cli.tiktok.drama_rules import validate_shared_settings
+        validate_shared_settings(source_campaign_data, source_adgroups)
     copy_strategy = deps.infer_campaign_copy_strategy(source_campaign_data, source_adgroups, [ad for ads in source_ads_by_adgroup.values() for ad in ads], smart_plus=effective_smart_plus)
     if copy_strategy.get('target_smart_plus') and source_campaign_data.get('objective_type') == 'APP_PROMOTION':
         deps.validate_smartplus_app_eligibility(client, advertiser_id=advertiser_id, payload=source_campaign_data, context_label=f'smartplus-campaigns copy source campaign {campaign_id}')
@@ -29,7 +35,23 @@ def load_tiktok_campaign_copy_source(client: TikTokClient, *, advertiser_id: str
         print(f'Copy strategy: {copy_strategy}', file=sys.stderr)
     return (source_campaign_data, effective_smart_plus, source_adgroups, source_ads_by_adgroup, copy_strategy)
 
-def execute_tiktok_campaign_copy(client: TikTokClient, *, advertiser_id: str, campaign_id: str, name: str, copies: int, operation_status: str, adgroup_status: str, ad_status: str, landing_page_url: str | None, page_id: str | None, skip_adgroups: bool, skip_ads: bool, smart_plus: bool, copy_route: str='auto', verbose: bool, deps) -> dict[str, Any]:
+def execute_tiktok_campaign_copy(client: TikTokClient, *, job_id=None, resume=False, store=None, **kwargs):
+    if resume and not job_id:
+        raise CliError('--resume requires the original --job-id; no new copy job was created.')
+    job_id = job_id or uuid.uuid4().hex
+    store = store or OperationStore()
+    config = {key: value for key, value in kwargs.items() if key not in ("deps", "verbose")}
+    with store.lock(job_id):
+        store.bind(job_id, config)
+        result = _execute_tiktok_campaign_copy(client, operation_store=store, job_id=job_id, resume=resume, **kwargs)
+        result["job_id"] = job_id
+        result["steps"] = store.rows(job_id)
+        if result.get("recovery"):
+            result["recovery"] = "Reuse --job-id with --resume for confirmed failed steps; unknown writes require remote reconciliation. Successful IDs are retained."
+        return result
+
+
+def _execute_tiktok_campaign_copy(client: TikTokClient, *, advertiser_id: str, campaign_id: str, name: str, copies: int, operation_status: str, adgroup_status: str, ad_status: str, landing_page_url: str | None, page_id: str | None, skip_adgroups: bool, skip_ads: bool, smart_plus: bool, copy_route: str='auto', verbose: bool, deps, operation_store, job_id, resume=False) -> dict[str, Any]:
     """Copy a campaign, retaining every successful write and failed child operation."""
     if copies < 1:
         raise deps.CliError('copies must be at least 1')
@@ -39,6 +61,25 @@ def execute_tiktok_campaign_copy(client: TikTokClient, *, advertiser_id: str, ca
     elif copy_route == 'normal':
         copy_strategy['target_smart_plus'] = False
     target_smart_plus = bool(copy_strategy.get('target_smart_plus', effective_smart_plus))
+    def submit_step(kind, payload, step_id):
+        payload = dict(payload)
+        if "request_id" in payload:
+            payload["request_id"] = str(int(digest([job_id, step_id])[:16], 16) % (2**63 - 1) + 1)
+        keys = {"campaign": ("campaign_id", "smart_plus_campaign_id"),
+                "adgroup": ("adgroup_id", "smart_plus_adgroup_id"),
+                "ad": ("smart_plus_ad_id", "ad_id", "ad_ids")}[kind]
+        result = []
+        def send(body):
+            response = getattr(client, "create_" + kind)(body, smart_plus=target_smart_plus)
+            result.append(response)
+            return response
+        object_id = operation_store.step(job_id, step_id, payload, send, keys, retry_failed=resume)
+        if result:
+            return result[0]
+        # A saved success is verified before its descendants are reused/created.
+        getattr(client, "get_" + kind)(advertiser_id, object_id, smart_plus=target_smart_plus)
+        return {"code": 0, "data": {keys[0]: object_id}}
+
     created_campaigns = []
     failed_campaigns = []
     for i in range(copies):
@@ -48,7 +89,7 @@ def execute_tiktok_campaign_copy(client: TikTokClient, *, advertiser_id: str, ca
             campaign_name = campaign_payload['campaign_name']
             if verbose:
                 print(f'Creating campaign {i + 1}/{copies}: {campaign_name}...', file=sys.stderr)
-            campaign_result = client.create_campaign(campaign_payload, smart_plus=target_smart_plus)
+            campaign_result = submit_step("campaign", campaign_payload, f"copy:{i}:campaign")
             campaign_data = campaign_result.get('data', {})
             new_campaign_id = campaign_data.get('campaign_id') or campaign_data.get('smart_plus_campaign_id')
             if not new_campaign_id:
@@ -71,7 +112,7 @@ def execute_tiktok_campaign_copy(client: TikTokClient, *, advertiser_id: str, ca
                             print(f'  Creating adgroup {adgroup_idx}/{len(source_adgroups)}: {adgroup_name}...', file=sys.stderr)
                             print(f'    Adgroup strategy: {adgroup_strategy}', file=sys.stderr)
                         adgroup_payload = deps.build_adgroup_copy_payload(source_adgroup, advertiser_id=advertiser_id, campaign_id=new_campaign_id, operation_status=adgroup_status, adgroup_strategy=adgroup_strategy)
-                        adgroup_result = client.create_adgroup(adgroup_payload, smart_plus=target_smart_plus)
+                        adgroup_result = submit_step("adgroup", adgroup_payload, f"copy:{i}:adgroup:{source_adgroup_id}")
                         adgroup_data = adgroup_result.get('data', {})
                         new_adgroup_id = adgroup_data.get('adgroup_id') or adgroup_data.get('smart_plus_adgroup_id')
                         if not new_adgroup_id:
@@ -99,7 +140,10 @@ def execute_tiktok_campaign_copy(client: TikTokClient, *, advertiser_id: str, ca
                                         ad_payload = deps.build_smart_plus_ad_copy_payload(source_ad, advertiser_id=advertiser_id, adgroup_id=new_adgroup_id, operation_status=ad_status, landing_page_url=landing_page_url, promotion_type=source_adgroup.get('promotion_type'), ad_strategy=ad_strategy)
                                     else:
                                         ad_payload = deps.build_normal_ad_copy_payload(source_ad, advertiser_id=advertiser_id, adgroup_id=new_adgroup_id, operation_status=ad_status, landing_page_url=landing_page_url, promotion_type=source_adgroup.get('promotion_type'), client=client, source_smart_plus=effective_smart_plus, ad_strategy=ad_strategy)
-                                    ad_result = client.create_ad(ad_payload, smart_plus=target_smart_plus)
+                                    source_ad_id = source_ad.get('smart_plus_ad_id') or source_ad.get('ad_id')
+                                    if not source_ad_id:
+                                        raise deps.CliError("Cannot checkpoint a copy without its source ad ID.")
+                                    ad_result = submit_step("ad", ad_payload, f"copy:{i}:adgroup:{source_adgroup_id}:ad:{source_ad_id}")
                                     ad_data = ad_result.get('data', {})
                                     ad_id = ad_data.get('smart_plus_ad_id') or ad_data.get('ad_id')
                                     if not ad_id:
@@ -153,7 +197,7 @@ def execute_tiktok_campaign_copy(client: TikTokClient, *, advertiser_id: str, ca
 
 def command_tiktok_campaigns_copy(args: argparse.Namespace, *, deps) -> None:
     advertiser_id, client = deps.resolve_tiktok_client(args)
-    result = deps.execute_tiktok_campaign_copy(client, advertiser_id=advertiser_id, campaign_id=args.campaign_id, name=args.name, copies=1 if args.copies is None else args.copies, operation_status=args.operation_status, adgroup_status=args.adgroup_status, ad_status=args.ad_status, landing_page_url=args.landing_page_url, page_id=getattr(args, 'page_id', None), skip_adgroups=args.skip_adgroups, skip_ads=args.skip_ads, smart_plus=args.smart_plus, copy_route=getattr(args, 'copy_route', 'auto'), verbose=args.verbose)
+    result = deps.execute_tiktok_campaign_copy(client, advertiser_id=advertiser_id, campaign_id=args.campaign_id, name=args.name, copies=1 if args.copies is None else args.copies, operation_status=args.operation_status, adgroup_status=args.adgroup_status, ad_status=args.ad_status, landing_page_url=args.landing_page_url, page_id=getattr(args, 'page_id', None), skip_adgroups=args.skip_adgroups, skip_ads=args.skip_ads, smart_plus=args.smart_plus, copy_route=getattr(args, 'copy_route', 'auto'), verbose=args.verbose, job_id=getattr(args, 'job_id', None), resume=getattr(args, 'resume', False))
     deps.print_output(result, as_json=args.json)
     if not result['ok']:
         raise deps.CliError(f"Campaign copy {result['status']}; see output for created objects and errors", exit_code=result['exit_code'])
@@ -191,7 +235,7 @@ def command_tiktok_smartplus_campaigns_bootstrap_app(args: argparse.Namespace, *
     if args.dry_run:
         deps.print_output(result, as_json=args.json)
         return
-    copy_result = deps.execute_tiktok_campaign_copy(client, advertiser_id=advertiser_id, campaign_id=str(template_campaign_id), name=args.name, copies=copies, operation_status=args.operation_status, adgroup_status=args.adgroup_status, ad_status=args.ad_status, landing_page_url=None, page_id=getattr(args, 'page_id', None), skip_adgroups=False, skip_ads=False, smart_plus=True, verbose=args.verbose)
+    copy_result = deps.execute_tiktok_campaign_copy(client, advertiser_id=advertiser_id, campaign_id=str(template_campaign_id), name=args.name, copies=copies, operation_status=args.operation_status, adgroup_status=args.adgroup_status, ad_status=args.ad_status, landing_page_url=None, page_id=getattr(args, 'page_id', None), skip_adgroups=False, skip_ads=False, smart_plus=True, verbose=args.verbose, job_id=getattr(args, 'job_id', None), resume=getattr(args, 'resume', False))
     result['copy_result'] = copy_result
     result['ok'] = copy_result['ok']
     result['status'] = copy_result['status']

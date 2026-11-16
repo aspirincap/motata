@@ -2,37 +2,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import uuid
 from pathlib import Path
 from typing import Any
 
-import requests
-
-from motata_cli.transport.gateway import GatewayAuthRef, RemoteGatewayTransport, gateway_enabled, auth_ref
 from motata_cli.common.errors import CliError
-from motata_cli.common.security import network_error, redact
-
-_SDK_TIMEOUT = (10, 120)
-
-from .sdk import get_business_api_client
-
-
-def _to_plain(value: Any) -> Any:
-    if hasattr(value, "to_dict"):
-        return _to_plain(value.to_dict())
-    if isinstance(value, dict):
-        return {key: _to_plain(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_to_plain(item) for item in value]
-    return value
-
-
-def _compact_params(values: dict[str, Any]) -> dict[str, Any]:
-    return {
-        key: value
-        for key, value in values.items()
-        if value is not None and value != [] and value != {}
-    }
+from motata_cli.transport.tiktok_http import TikTokHTTP
+from motata_cli.tiktok.codec import compact as _compact_params
+from motata_cli.tiktok.endpoints import ENDPOINTS, endpoint_for
+from motata_cli.tiktok.errors import check_response
 
 
 def _extract_collection(response: dict[str, Any]) -> list[dict[str, Any]]:
@@ -49,48 +28,14 @@ class TikTokClient:
     BASE_URL = "https://business-api.tiktok.com/open_api/v1.3/"
     PAGE_GET_URL = "https://business-api.tiktok.com/open_api/v1.3/page/get/"
 
-    def __init__(self, access_token: str | GatewayAuthRef | None):
-        self.gateway = None
-        self.auth_ref = None
-        if isinstance(access_token, GatewayAuthRef) or gateway_enabled():
-            if access_token is not None and not isinstance(access_token, GatewayAuthRef):
-                raise CliError("Direct access tokens are disabled in gateway mode.", exit_code=2)
-            self.auth_ref = access_token or auth_ref("tiktok")
-            self.gateway = RemoteGatewayTransport.from_environment()
-            self.access_token = None
-            # Do not create the SDK's thread pool or secret-bearing client for gateway reads.
-            return
+    def __init__(self, access_token=None, *, transport=None, retry_policy=None):
+        if os.getenv("MOTATA_AUTH_MODE", "direct") != "direct":
+            raise CliError("TikTok supports Direct HTTP only; gateway mode has no automatic fallback.", exit_code=2)
         self.access_token = access_token
-        self.sdk = get_business_api_client()
-        self.api_client = self.sdk.ApiClient()
-        self.auth_api = self.sdk.AuthenticationApi(self.api_client)
-        self.account_api = self.sdk.AccountManagementApi(self.api_client)
-        self.app_api = self.sdk.APPManagementApi(self.api_client)
-        self.campaign_api = self.sdk.CampaignCreationApi(self.api_client)
-        self.adgroup_api = self.sdk.AdgroupApi(self.api_client)
-        self.ad_api = self.sdk.AdApi(self.api_client)
-        self.file_api = self.sdk.FileApi(self.api_client)
-        self.creative_api = self.sdk.CreativeManagementApi(self.api_client)
-        self.catalog_api = self.sdk.CatalogApi(self.api_client)
-        self.measurement_api = self.sdk.MeasurementApi(self.api_client)
-        self.store_api = self.sdk.StoreApi(self.api_client)
-        self.tool_api = self.sdk.ToolApi(self.api_client)
-        self.reporting_api = self.sdk.ReportingApi(self.api_client)
-        self.identity_api = self.sdk.IdentityApi(self.api_client)
+        self.transport = transport or TikTokHTTP(access_token, retry_policy=retry_policy)
 
-    def _invoke(self, fn, *args, **kwargs) -> dict[str, Any]:
-        if getattr(self, "gateway", None) is not None:
-            raise CliError("GATEWAY_OPERATION_UNAVAILABLE: this SDK path is not migrated yet.")
-        kwargs["_request_timeout"] = _SDK_TIMEOUT
-        try:
-            return _to_plain(fn(*args, **kwargs))
-        except Exception as exc:  # SDK exception bodies can contain credentials.
-            # SDK method names are not a reliable read/write classification.
-            # Conservatively warn on unknown outcomes; never retry here.
-            raise CliError(network_error("TikTok API", exc, write=True)) from None
-
-    def _list_entities(self, method, advertiser_id: str, **params) -> dict[str, Any]:
-        return self._invoke(method, advertiser_id, self.access_token, **_compact_params(params))
+    def _request(self, endpoint_id, *, params=None, body=None, files=None, timeout=None):
+        return self.transport.request(ENDPOINTS[endpoint_id], params=params, body=body, files=files, timeout=timeout)
 
     def _list_entities_raw(
         self,
@@ -128,47 +73,10 @@ class TikTokClient:
         json_body: dict[str, Any] | None = None,
         timeout: int = 60,
     ) -> dict[str, Any]:
-        if getattr(self, "gateway", None) is not None:
-            envelope = self.gateway.request(auth=self.auth_ref, method=method.upper(), path=path,
-                                            query=params, body=json_body)
-            return self._check_response(envelope["data"])
-        serialized_params: dict[str, Any] = {}
-        for key, value in (params or {}).items():
-            if value is None or value == [] or value == {}:
-                continue
-            if isinstance(value, (dict, list)):
-                serialized_params[key] = json.dumps(value, ensure_ascii=False)
-            else:
-                serialized_params[key] = value
-
-        try:
-            response = requests.request(
-                method.upper(),
-                f"{self.BASE_URL}{path.lstrip('/')}",
-                params=serialized_params or None,
-                json=json_body,
-                headers={"Access-Token": self.access_token},
-                timeout=(10, timeout),
-            )
-            response.raise_for_status()
-            data = response.json()
-        except (requests.RequestException, ValueError) as exc:
-            # No implicit retries: a failed write may already have been applied.
-            raise CliError(network_error("TikTok API", exc, write=method.upper() not in {"GET", "HEAD", "OPTIONS"})) from None
-
-        return self._check_response(data)
+        return self.transport.request(endpoint_for(method, path), params=params, body=json_body, timeout=timeout)
 
     def _check_response(self, data: Any) -> dict[str, Any]:
-        if not isinstance(data, dict):
-            raise CliError("TikTok API returned an invalid response object.")
-        if data.get("code") not in (None, 0, "0"):
-            safe = redact(data, (self.access_token,))
-            raise CliError(redact(
-                "TikTok API request failed: "
-                f"Error Code: {safe.get('code')}, message: {safe.get('message')}, request_id: {safe.get('request_id')}",
-                (self.access_token,),
-            ))
-        return data
+        return check_response(data, token=self.access_token if isinstance(self.access_token, str) else None)
 
     def create_changelog_task(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._raw_request(
@@ -290,12 +198,7 @@ class TikTokClient:
         advertiser_id: str,
         campaign_id: str,
     ) -> dict[str, Any]:
-        return self._invoke(
-            self.campaign_api.campaign_gmv_max_info,
-            advertiser_id,
-            str(campaign_id),
-            self.access_token,
-        )
+        return self._request('campaign_gmv_max_info', params={'advertiser_id': advertiser_id, 'campaign_id': str(campaign_id)})
 
     def get_campaign(
         self,
@@ -316,20 +219,20 @@ class TikTokClient:
         )
 
     def create_campaign(self, payload: dict[str, Any], *, smart_plus: bool = False) -> dict[str, Any]:
-        method = self.campaign_api.smart_plus_campaign_create if smart_plus else self.campaign_api.campaign_create
-        return self._invoke(method, self.access_token, body=payload)
+        method = 'smart_plus_campaign_create' if smart_plus else 'campaign_create'
+        return self._request(method, body=payload)
 
     def update_campaign(self, payload: dict[str, Any], *, smart_plus: bool = False) -> dict[str, Any]:
-        method = self.campaign_api.smart_plus_campaign_update if smart_plus else self.campaign_api.campaign_update
-        return self._invoke(method, self.access_token, body=payload)
+        method = 'smart_plus_campaign_update' if smart_plus else 'campaign_update'
+        return self._request(method, body=payload)
 
     def update_campaign_status(self, payload: dict[str, Any], *, smart_plus: bool = False) -> dict[str, Any]:
         method = (
-            self.campaign_api.smart_plus_campaign_status_update
+            'smart_plus_campaign_status_update'
             if smart_plus
-            else self.campaign_api.campaign_status_update
+            else 'campaign_status_update'
         )
-        return self._invoke(method, self.access_token, body=payload)
+        return self._request(method, body=payload)
 
     def list_adgroups(
         self,
@@ -371,20 +274,30 @@ class TikTokClient:
         )
 
     def create_adgroup(self, payload: dict[str, Any], *, smart_plus: bool = False) -> dict[str, Any]:
-        method = self.adgroup_api.smart_plus_adgroup_create if smart_plus else self.adgroup_api.adgroup_create
-        return self._invoke(method, self.access_token, body=payload)
+        method = 'smart_plus_adgroup_create' if smart_plus else 'adgroup_create'
+        return self._request(method, body=payload)
 
     def update_adgroup(self, payload: dict[str, Any], *, smart_plus: bool = False) -> dict[str, Any]:
-        method = self.adgroup_api.smart_plus_adgroup_update if smart_plus else self.adgroup_api.adgroup_update
-        return self._invoke(method, self.access_token, body=payload)
+        if smart_plus:
+            from .smartplus_adgroup_update import CONTEXT_FIELDS, validate_update, validate_context
+            validate_update(payload)
+            if CONTEXT_FIELDS.intersection(payload):
+                group = self.get_adgroup(payload['advertiser_id'], payload['adgroup_id'], smart_plus=True)
+                campaign_id = group.get('campaign_id')
+                if not isinstance(campaign_id, str) or not campaign_id:
+                    raise CliError('Cannot validate Smart+ update: current adgroup has no campaign_id.')
+                campaign = self.get_campaign(payload['advertiser_id'], campaign_id, smart_plus=True)
+                validate_context(payload, group, campaign)
+        method = 'smart_plus_adgroup_update' if smart_plus else 'adgroup_update'
+        return self._request(method, body=payload)
 
     def update_adgroup_status(self, payload: dict[str, Any], *, smart_plus: bool = False) -> dict[str, Any]:
         method = (
-            self.adgroup_api.smart_plus_adgroup_status_update
+            'smart_plus_adgroup_status_update'
             if smart_plus
-            else self.adgroup_api.adgroup_status_update
+            else 'adgroup_status_update'
         )
-        return self._invoke(method, self.access_token, body=payload)
+        return self._request(method, body=payload)
 
     def list_ads(
         self,
@@ -427,16 +340,16 @@ class TikTokClient:
         )
 
     def create_ad(self, payload: dict[str, Any], *, smart_plus: bool = False) -> dict[str, Any]:
-        method = self.ad_api.smart_plus_ad_create if smart_plus else self.ad_api.ad_create
-        return self._invoke(method, self.access_token, body=payload)
+        method = 'smart_plus_ad_create' if smart_plus else 'ad_create'
+        return self._request(method, body=payload)
 
     def update_ad(self, payload: dict[str, Any], *, smart_plus: bool = False) -> dict[str, Any]:
-        method = self.ad_api.smart_plus_ad_update if smart_plus else self.ad_api.ad_update
-        return self._invoke(method, self.access_token, body=payload)
+        method = 'smart_plus_ad_update' if smart_plus else 'ad_update'
+        return self._request(method, body=payload)
 
     def update_ad_status(self, payload: dict[str, Any], *, smart_plus: bool = False) -> dict[str, Any]:
-        method = self.ad_api.smart_plus_ad_status_update if smart_plus else self.ad_api.ad_status_update
-        return self._invoke(method, self.access_token, body=payload)
+        method = 'smart_plus_ad_status_update' if smart_plus else 'ad_status_update'
+        return self._request(method, body=payload)
 
     def upload_image(
         self,
@@ -449,11 +362,17 @@ class TikTokClient:
         image_url: str | None = None,
         file_id: str | None = None,
     ) -> dict[str, Any]:
-        if not file_path and not image_url:
-            raise CliError("Image upload requires either file_path or image_url")
+        if not any((file_path, image_url, file_id)):
+            raise CliError("Image upload requires file_path, image_url or file_id")
+        if file_path and image_url:
+            raise CliError("Specify either an image file or URL, not both")
 
         if upload_type is None:
+            if file_id and not file_path and not image_url:
+                raise CliError("file_id upload requires an explicit upload_type")
             upload_type = "UPLOAD_BY_URL" if image_url else "UPLOAD_BY_FILE"
+        if (upload_type == "UPLOAD_BY_URL" and not image_url) or (upload_type == "UPLOAD_BY_FILE" and not file_path):
+            raise CliError("Image upload_type does not match the supplied file/URL")
 
         kwargs: dict[str, Any] = {
             "advertiser_id": str(advertiser_id),
@@ -463,19 +382,15 @@ class TikTokClient:
             "file_id": file_id,
         }
 
-        if image_url:
+        if not file_path:
             base_name = file_name or "image.jpg"
             stem = Path(base_name).stem or "image"
             suffix = Path(base_name).suffix or ".jpg"
             kwargs["file_name"] = f"{stem}-{uuid.uuid4().hex[:8]}{suffix}"
-            return self._raw_request(
-                "POST",
-                "file/image/ad/upload/",
-                json_body=_compact_params(kwargs),
-            )
+            return self._request("ad_image_upload", body=_compact_params(kwargs))
 
         path = Path(file_path).expanduser()
-        if not path.exists():
+        if not path.is_file():
             raise CliError(f"Image file not found: {path}")
 
         # Calculate MD5 hash automatically if not provided (required by TikTok API)
@@ -489,16 +404,15 @@ class TikTokClient:
         kwargs.update(
             {
                 "file_name": file_name or path.name,
-                "image_file": str(path),
                 "image_signature": image_signature,
             }
         )
-        return self._invoke(self.file_api.ad_image_upload, self.access_token, **_compact_params(kwargs))
+        return self._request("ad_image_upload", body=_compact_params(kwargs), files={"image_file": str(path)})
 
     def upload_video(
         self,
         advertiser_id: str,
-        file_path: str,
+        file_path: str | None = None,
         *,
         file_name: str | None = None,
         upload_type: str | None = None,
@@ -511,12 +425,18 @@ class TikTokClient:
         flaw_detect: bool | None = None,
         is_third_party: bool | None = None,
     ) -> dict[str, Any]:
-        path = Path(file_path).expanduser()
-        if not path.exists():
+        if not any((file_path, video_url, file_id, video_id)):
+            raise CliError("Video upload requires file_path, video_url, file_id or video_id")
+        if file_path and video_url:
+            raise CliError("Specify either a video file or URL, not both")
+        if (upload_type == "UPLOAD_BY_URL" and not video_url) or (upload_type == "UPLOAD_BY_FILE" and not file_path):
+            raise CliError("Video upload_type does not match the supplied file/URL")
+        path = Path(file_path).expanduser() if file_path else None
+        if path and not path.is_file():
             raise CliError(f"Video file not found: {path}")
 
         # Calculate MD5 hash automatically if not provided (required by TikTok API)
-        if video_signature is None:
+        if path and video_signature is None:
             md5_hash = hashlib.md5()
             with open(path, "rb") as f:
                 for chunk in iter(lambda: f.read(8192), b""):
@@ -526,8 +446,7 @@ class TikTokClient:
         # Build kwargs with only non-None values to avoid API validation errors
         kwargs = {
             "advertiser_id": str(advertiser_id),
-            "file_name": file_name or path.name,
-            "video_file": str(path),
+            "file_name": file_name or (path.name if path else None),
             "video_signature": video_signature,
         }
 
@@ -546,10 +465,13 @@ class TikTokClient:
             kwargs["auto_fix_enabled"] = auto_fix_enabled
         if flaw_detect is not None:
             kwargs["flaw_detect"] = flaw_detect
-        # Explicitly set is_third_party to False if None (SDK doesn't handle None properly)
+        # Preserve the CLI's historical default, including explicit false.
         kwargs["is_third_party"] = is_third_party if is_third_party is not None else False
 
-        return self._invoke(self.file_api.ad_video_upload, self.access_token, **kwargs)
+        if not path and video_url:
+            kwargs.setdefault("upload_type", "UPLOAD_BY_URL")
+        return self._request("ad_video_upload", body=_compact_params(kwargs),
+                             files={"video_file": str(path)} if path else None)
 
     def get_image_info(self, advertiser_id: str, image_ids: list[str]) -> dict[str, Any]:
         return self._raw_request(
@@ -596,36 +518,25 @@ class TikTokClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any]:
-        return self._list_entities(
-            self.file_api.ad_video_search,
-            advertiser_id,
-            filtering=filtering,
-            page=page,
-            page_size=page_size,
-        )
+        return self._request('ad_video_search', params={'advertiser_id': advertiser_id, 'filtering': filtering, 'page': page, 'page_size': page_size})
 
     def delete_assets(self, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.creative_api.creative_asset_delete, self.access_token, body=payload)
+        return self._request('creative_asset_delete', body=payload)
 
     def share_assets(self, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.creative_api.creative_asset_share, self.access_token, body=payload)
+        return self._request('creative_asset_share', body=payload)
 
     def get_account_info(self, advertiser_ids: list[str], *, fields: list[str] | None = None) -> dict[str, Any]:
-        return self._invoke(
-            self.account_api.advertiser_info,
-            advertiser_ids,
-            self.access_token,
-            **_compact_params({"fields": fields}),
-        )
+        return self._request('advertiser_info', params={'advertiser_ids': advertiser_ids, **_compact_params({'fields': fields})})
 
     def oauth2_advertiser_get(self, app_id: str, secret: str) -> dict[str, Any]:
-        return self._invoke(self.auth_api.oauth2_advertiser_get, app_id, secret, self.access_token)
+        return self._request('oauth2_advertiser_get', params={'app_id': app_id, 'secret': secret})
 
     def update_account(self, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.account_api.advertiser_update, self.access_token, body=payload)
+        return self._request('advertiser_update', body=payload)
 
     def list_pixels(self, advertiser_id: str) -> dict[str, Any]:
-        return self._invoke(self.measurement_api.pixel_list, advertiser_id, self.access_token)
+        return self._request('pixel_list', params={'advertiser_id': advertiser_id})
 
     def list_offline_event_sets(
         self,
@@ -634,17 +545,7 @@ class TikTokClient:
         event_set_ids: list[str] | None = None,
         name: str | None = None,
     ) -> dict[str, Any]:
-        return self._invoke(
-            self.measurement_api.offline_get,
-            self.access_token,
-            **_compact_params(
-                {
-                    "advertiser_id": advertiser_id,
-                    "event_set_ids": event_set_ids,
-                    "name": name,
-                }
-            ),
-        )
+        return self._request('offline_get', params={**_compact_params({'advertiser_id': advertiser_id, 'event_set_ids': event_set_ids, 'name': name})})
 
     def list_apps(
         self,
@@ -652,15 +553,10 @@ class TikTokClient:
         *,
         app_platform_ids: list[str] | None = None,
     ) -> dict[str, Any]:
-        return self._invoke(
-            self.app_api.app_list,
-            advertiser_id,
-            self.access_token,
-            **_compact_params({"app_platform_ids": app_platform_ids}),
-        )
+        return self._request('app_list', params={'advertiser_id': advertiser_id, **_compact_params({'app_platform_ids': app_platform_ids})})
 
     def get_app_info(self, advertiser_id: str, app_id: str) -> dict[str, Any]:
-        return self._invoke(self.app_api.app_info, advertiser_id, app_id, self.access_token)
+        return self._request('app_info', params={'advertiser_id': advertiser_id, 'app_id': app_id})
 
     def list_pages(
         self,
@@ -690,19 +586,7 @@ class TikTokClient:
         if page_size is not None:
             params["page_size"] = page_size
 
-        try:
-            response = requests.get(
-                self.PAGE_GET_URL,
-                params=params,
-                headers={"Access-Token": self.access_token},
-                timeout=(10, 30),
-            )
-            response.raise_for_status()
-            data = response.json()
-        except (requests.RequestException, ValueError) as exc:
-            raise CliError(network_error("TikTok API", exc)) from None
-
-        return self._check_response(data)
+        return self._raw_request("GET", "page/get/", params=params, timeout=30)
 
     def list_aigc_voices(
         self,
@@ -877,23 +761,7 @@ class TikTokClient:
         is_skan: bool | None = None,
         app_promotion_type: str | None = None,
     ) -> dict[str, Any]:
-        return self._invoke(
-            self.app_api.app_optimization_event,
-            app_id,
-            advertiser_id,
-            optimization_goal,
-            self.access_token,
-            **_compact_params(
-                {
-                    "placement": placement,
-                    "placement_type": placement_type,
-                    "objective": objective,
-                    "available_only": available_only,
-                    "is_skan": is_skan,
-                    "app_promotion_type": app_promotion_type,
-                }
-            ),
-        )
+        return self._request('app_optimization_event', params={'app_id': app_id, 'advertiser_id': advertiser_id, 'optimization_goal': optimization_goal, **_compact_params({'placement': placement, 'placement_type': placement_type, 'objective': objective, 'available_only': available_only, 'is_skan': is_skan, 'app_promotion_type': app_promotion_type})})
 
     def list_catalogs(
         self,
@@ -903,29 +771,13 @@ class TikTokClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any]:
-        return self._invoke(
-            self.catalog_api.catalog_get,
-            bc_id,
-            self.access_token,
-            **_compact_params(
-                {
-                    "catalog_id": catalog_id,
-                    "page": page,
-                    "page_size": page_size,
-                }
-            ),
-        )
+        return self._request('catalog_get', params={'bc_id': bc_id, **_compact_params({'catalog_id': catalog_id, 'page': page, 'page_size': page_size})})
 
     def get_catalog_eventsource_bindings(self, catalog_id: str, bc_id: str) -> dict[str, Any]:
-        return self._invoke(
-            self.catalog_api.catalog_eventsource_bind_get,
-            catalog_id,
-            bc_id,
-            self.access_token,
-        )
+        return self._request('catalog_eventsource_bind_get', params={'catalog_id': catalog_id, 'bc_id': bc_id})
 
     def list_stores(self, advertiser_id: str) -> dict[str, Any]:
-        return self._invoke(self.store_api.gmv_max_store_list, advertiser_id, self.access_token)
+        return self._request('gmv_max_store_list', params={'advertiser_id': advertiser_id})
 
     def list_store_products(
         self,
@@ -971,26 +823,7 @@ class TikTokClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any]:
-        return self._invoke(
-            self.reporting_api.gmv_max_report_get,
-            advertiser_id,
-            store_ids,
-            dimensions,
-            metrics,
-            start_date,
-            end_date,
-            self.access_token,
-            **_compact_params(
-                {
-                    "filtering": filtering,
-                    "enable_total_metrics": enable_total_metrics,
-                    "sort_field": sort_field,
-                    "sort_type": sort_type,
-                    "page": page,
-                    "page_size": page_size,
-                }
-            ),
-        )
+        return self._request('gmv_max_report_get', params={'advertiser_id': advertiser_id, 'store_ids': store_ids, 'dimensions': dimensions, 'metrics': metrics, 'start_date': start_date, 'end_date': end_date, **_compact_params({'filtering': filtering, 'enable_total_metrics': enable_total_metrics, 'sort_field': sort_field, 'sort_type': sort_type, 'page': page, 'page_size': page_size})})
 
     def list_gmv_max_custom_anchor_videos(self, payload: dict[str, Any]) -> dict[str, Any]:
         return self._raw_request(
@@ -1037,30 +870,19 @@ class TikTokClient:
         )
 
     def search_regions(self, advertiser_id: str, *, language: str | None = None) -> dict[str, Any]:
-        return self._invoke(
-            self.tool_api.search_region,
-            advertiser_id,
-            self.access_token,
-            language=language,
-        )
+        return self._request('search_region', params={'advertiser_id': advertiser_id, 'language': language})
 
     def targeting_search(self, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.tool_api.tool_targeting_search, self.access_token, body=payload)
+        return self._request('tool_targeting_search', body=payload)
 
     def targeting_info(self, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.tool_api.tool_targeting_info, self.access_token, body=payload)
+        return self._request('tool_targeting_info', body=payload)
 
     def targeting_list(self, advertiser_id: str, location_ids: list[str], scene: str) -> dict[str, Any]:
-        return self._invoke(
-            self.tool_api.tool_targeting_list,
-            advertiser_id,
-            location_ids,
-            scene,
-            self.access_token,
-        )
+        return self._request('tool_targeting_list', params={'advertiser_id': advertiser_id, 'location_ids': location_ids, 'scene': scene})
 
     def validate_url(self, advertiser_id: str, url: str) -> dict[str, Any]:
-        return self._invoke(self.tool_api.tool_url_validate, advertiser_id, url, self.access_token)
+        return self._request('tool_url_validate', params={'advertiser_id': advertiser_id, 'url': url})
 
     def get_vbo_status(
         self,
@@ -1080,28 +902,7 @@ class TikTokClient:
         budget_optimize_on: bool | None = None,
         campaign_type: str | None = None,
     ) -> dict[str, Any]:
-        return self._invoke(
-            self.tool_api.tool_vbo_status,
-            advertiser_id,
-            objective_type,
-            promotion_type,
-            placements,
-            self.access_token,
-            **_compact_params(
-                {
-                    "pixel_id": pixel_id,
-                    "app_id": app_id,
-                    "optimization_event": optimization_event,
-                    "ios14_quota_type": ios14_quota_type,
-                    "app_promotion_type": app_promotion_type,
-                    "store_id": store_id,
-                    "campaign_app_profile_page_state": campaign_app_profile_page_state,
-                    "is_smart_performance_campaign": is_smart_performance_campaign,
-                    "budget_optimize_on": budget_optimize_on,
-                    "campaign_type": campaign_type,
-                }
-            ),
-        )
+        return self._request('tool_vbo_status', params={'advertiser_id': advertiser_id, 'objective_type': objective_type, 'promotion_type': promotion_type, 'placements': placements, **_compact_params({'pixel_id': pixel_id, 'app_id': app_id, 'optimization_event': optimization_event, 'ios14_quota_type': ios14_quota_type, 'app_promotion_type': app_promotion_type, 'store_id': store_id, 'campaign_app_profile_page_state': campaign_app_profile_page_state, 'is_smart_performance_campaign': is_smart_performance_campaign, 'budget_optimize_on': budget_optimize_on, 'campaign_type': campaign_type})})
 
     def integrated_report(
         self,
@@ -1168,25 +969,7 @@ class TikTokClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any]:
-        return self._invoke(
-            self.reporting_api.smart_plus_material_report_overview,
-            advertiser_id,
-            dimensions,
-            self.access_token,
-            **_compact_params(
-                {
-                    "metrics": metrics,
-                    "start_date": start_date,
-                    "end_date": end_date,
-                    "query_lifetime": query_lifetime,
-                    "filtering": filtering,
-                    "sort_field": sort_field,
-                    "sort_type": sort_type,
-                    "page": page,
-                    "page_size": page_size,
-                }
-            ),
-        )
+        return self._request('smart_plus_material_report_overview', params={'advertiser_id': advertiser_id, 'dimensions': dimensions, **_compact_params({'metrics': metrics, 'start_date': start_date, 'end_date': end_date, 'query_lifetime': query_lifetime, 'filtering': filtering, 'sort_field': sort_field, 'sort_type': sort_type, 'page': page, 'page_size': page_size})})
 
     def smart_plus_material_report_breakdown(
         self,
@@ -1202,24 +985,7 @@ class TikTokClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any]:
-        return self._invoke(
-            self.reporting_api.smart_plus_material_report_breakdown,
-            advertiser_id,
-            dimensions,
-            start_date,
-            end_date,
-            self.access_token,
-            **_compact_params(
-                {
-                    "metrics": metrics,
-                    "filtering": filtering,
-                    "sort_field": sort_field,
-                    "sort_type": sort_type,
-                    "page": page,
-                    "page_size": page_size,
-                }
-            ),
-        )
+        return self._request('smart_plus_material_report_breakdown', params={'advertiser_id': advertiser_id, 'dimensions': dimensions, 'start_date': start_date, 'end_date': end_date, **_compact_params({'metrics': metrics, 'filtering': filtering, 'sort_field': sort_field, 'sort_type': sort_type, 'page': page, 'page_size': page_size})})
 
     def list_identities(
         self,
@@ -1230,22 +996,10 @@ class TikTokClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any]:
-        return self._invoke(
-            self.identity_api.identity_get,
-            advertiser_id,
-            self.access_token,
-            **_compact_params(
-                {
-                    "identity_type": identity_type,
-                    "identity_authorized_bc_id": identity_authorized_bc_id,
-                    "page": page,
-                    "page_size": page_size,
-                }
-            ),
-        )
+        return self._request('identity_get', params={'advertiser_id': advertiser_id, **_compact_params({'identity_type': identity_type, 'identity_authorized_bc_id': identity_authorized_bc_id, 'page': page, 'page_size': page_size})})
 
     def create_identity(self, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.identity_api.identity_create, self.access_token, body=payload)
+        return self._request('identity_create', body=payload)
 
     def get_identity_video_info(
         self,
@@ -1281,36 +1035,33 @@ class TikTokClient:
         page: int | None = None,
         page_size: int | None = None,
     ) -> dict[str, Any]:
-        return self._invoke(
-            self.creative_api.creative_portfolio_list,
-            advertiser_id,
-            self.access_token,
-            **_compact_params(
-                {
-                    "filtering": filtering,
-                    "page": page,
-                    "page_size": page_size,
-                }
-            ),
-        )
+        return self._request('creative_portfolio_list', params={'advertiser_id': advertiser_id, **_compact_params({'filtering': filtering, 'page': page, 'page_size': page_size})})
 
     def get_creative_portfolio(self, advertiser_id: str, creative_portfolio_id: str) -> dict[str, Any]:
-        return self._invoke(
-            self.creative_api.creative_portfolio_get,
-            advertiser_id,
-            creative_portfolio_id,
-            self.access_token,
-        )
+        return self._request('creative_portfolio_get', params={'advertiser_id': advertiser_id, 'creative_portfolio_id': creative_portfolio_id})
 
     def create_creative_portfolio(self, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.creative_api.creative_portfolio_create, self.access_token, body=payload)
+        return self._request('creative_portfolio_create', body=payload)
 
     def create_shareable_link(self, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.creative_api.creative_shareable_link_create, self.access_token, body=payload)
+        return self._request('creative_shareable_link_create', body=payload)
 
     def generate_smart_text(self, payload: dict[str, Any]) -> dict[str, Any]:
-        return self._invoke(self.creative_api.creative_smart_text_generate, self.access_token, body=payload)
+        return self._request('creative_smart_text_generate', body=payload)
+
+    def list_native_series(self, advertiser_id: str, *, identity_id: str, identity_type: str,
+                           identity_authorized_bc_id: str | None = None, page: int = 1,
+                           page_size: int = 20) -> dict[str, Any]:
+        return self._request("identity_native_series_get", params={
+            "advertiser_id": advertiser_id, "identity_id": identity_id, "identity_type": identity_type,
+            "identity_authorized_bc_id": identity_authorized_bc_id, "page": page, "page_size": page_size,
+        })
 
     def close(self) -> None:
-        if getattr(self, "gateway", None) is not None:
-            self.gateway.close()
+        self.transport.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()

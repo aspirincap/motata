@@ -3,12 +3,22 @@ from __future__ import annotations
 import unittest
 from unittest.mock import Mock, patch
 
+import requests
+
 from motata_cli.meta.commands import CliError
 from motata_cli.report.completeness import completeness, finalize
 from motata_cli.tiktok.landing_pages import _report_rows, build_tiktok_landing_page_report
+from motata_cli.tiktok.client import TikTokClient
+from motata_cli.tiktok.errors import TikTokError
+from motata_cli.transport.tiktok_http import TikTokHTTP
 
 
 class ReportCompletenessTests(unittest.TestCase):
+    def setUp(self):
+        limiter = patch('motata_cli.transport.tiktok_http.default_read_throttle')
+        limiter.start().return_value.acquire_delay.return_value = 0.0
+        self.addCleanup(limiter.stop)
+
     def pull(self, client, **kwargs):
         return _report_rows(client, 'a', start_date='2026-01-01', end_date='2026-01-02',
                             page_size=1, max_pages=1, **kwargs)
@@ -31,15 +41,16 @@ class ReportCompletenessTests(unittest.TestCase):
                 self.pull(client)
             self.assertEqual(client.integrated_report.call_count, 1)
 
-    @patch('motata_cli.common.output.time.sleep')
+    @patch('motata_cli.transport.tiktok_http.time.sleep')
     def test_network_retries_same_parameters_bounded(self, sleep):
-        client = Mock()
-        client.integrated_report.side_effect = TimeoutError('timed out')
-        with self.assertRaises(TimeoutError):
+        session = Mock()
+        session.request.side_effect = requests.ReadTimeout('timed out')
+        client = TikTokClient('fixture-token', transport=TikTokHTTP('fixture-token', session=session))
+        with self.assertRaises(TikTokError):
             self.pull(client)
-        self.assertEqual(client.integrated_report.call_count, 3)
-        self.assertEqual(sleep.call_count, 2)
-        self.assertEqual(len(set(str(call) for call in client.integrated_report.call_args_list)), 1)
+        self.assertEqual(session.request.call_count, 5)
+        self.assertEqual(sleep.call_count, 4)
+        self.assertEqual(len(set(str(call.kwargs['params']) for call in session.request.call_args_list)), 1)
 
     def test_explicit_metric_error_allows_fallback(self):
         client = Mock()

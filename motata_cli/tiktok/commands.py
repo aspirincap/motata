@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 
 from motata_cli.common.errors import CliError
 from motata_cli.common.auth import resolve_auth
+from motata_cli.auth_center.provider import add_auth_arguments, options_from_args
 from motata_cli.common.utils import load_json_file, parse_json_option, write_json_file, validate_non_empty
 from motata_cli.common.display import print_output
 from motata_cli.product import scrape_product
@@ -163,10 +164,11 @@ TIKTOK_GMV_MAX_ITEM_SCOPE_SPECIFIC_ITEM = "SPECIFIC_ITEM"
 
 def add_tiktok_auth_arguments(parser: argparse.ArgumentParser, *, needs_advertiser: bool = True) -> None:
     if needs_advertiser:
-        parser.add_argument("--advertiser-id", "--account-id", "--account", dest="advertiser_id", required=True)
+        parser.add_argument("--advertiser-id", "--account-id", "--account", dest="advertiser_id")
     else:
         parser.add_argument("--advertiser-id", "--account-id", "--account", dest="advertiser_id")
-    parser.add_argument("--access-token", default=os.environ.get("TIKTOK_ACCESS_TOKEN") or os.environ.get("MOTATA_TIKTOK_ACCESS_TOKEN"))
+    parser.add_argument("--access-token")
+    add_auth_arguments(parser)
     parser.add_argument("--json", action="store_true", default=True)
 
 
@@ -199,12 +201,23 @@ def parse_json_arg(raw: str | None, label: str, expected_type: type | tuple[type
 
 
 def resolve_tiktok_client(args: argparse.Namespace) -> tuple[str, TikTokClient]:
-    advertiser_id = validate_non_empty(getattr(args, "advertiser_id", None), "advertiser_id")
+    from motata_cli.init_profile import resolve_default_account
+    advertiser_id = getattr(args, "advertiser_id", None) or resolve_default_account("tiktok")[0]
+    advertiser_id = validate_non_empty(advertiser_id, "advertiser_id")
+    args.advertiser_id = advertiser_id
     auth = resolve_auth(
         account_id=advertiser_id,
         media_code="tiktok",
-        access_token=args.access_token,
+        access_token=getattr(args, "access_token", None),
+        **options_from_args(args),
     )
+    if hasattr(args, 'retry'):
+        from motata_cli.tiktok.retry import ReadRetryPolicy
+        try:
+            policy = ReadRetryPolicy(max_attempts=args.retry, base_delay=args.retry_wait)
+        except ValueError as exc:
+            raise CliError(str(exc)) from None
+        return advertiser_id, TikTokClient(auth.access_token, retry_policy=policy)
     return advertiser_id, TikTokClient(auth.access_token)
 
 
@@ -1968,7 +1981,7 @@ def command_tiktok_validate_promoted_object(args: argparse.Namespace) -> None:
     if not placements:
         add_validation_error(result, "placements_missing", "Missing placements")
 
-    if objective_type == "APP_PROMOTION" and not app_id:
+    if objective_type == "APP_PROMOTION" and app_promotion_type != "MINIS" and not app_id:
         add_validation_error(result, "app_id_missing", "APP_PROMOTION requires app_id")
     if objective_type == "WEB_CONVERSIONS" and promotion_type == "WEBSITE" and not pixel_id:
         add_validation_error(result, "pixel_id_missing", "WEB_CONVERSIONS website flow usually requires pixel_id")
@@ -2492,7 +2505,7 @@ def build_tiktok_smartplus_app_create_hint(
     payload: dict[str, Any],
     error_text: str | None = None,
 ) -> str | None:
-    if payload.get("objective_type") != "APP_PROMOTION":
+    if payload.get("objective_type") != "APP_PROMOTION" or payload.get("app_promotion_type") == "MINIS":
         return None
     if error_text and "40002" in error_text and "advanced dedicated campaign" in error_text.lower():
         state = str(payload.get("campaign_app_profile_page_state") or "").upper() or "UNSET"
@@ -2574,8 +2587,8 @@ def load_tiktok_campaign_copy_source(client: TikTokClient, *, advertiser_id: str
     return _campaign_copy.load_tiktok_campaign_copy_source(client, advertiser_id=advertiser_id, campaign_id=campaign_id, smart_plus=smart_plus, skip_adgroups=skip_adgroups, skip_ads=skip_ads, verbose=verbose, deps=_campaign_copy_dependencies())
 
 
-def execute_tiktok_campaign_copy(client: TikTokClient, *, advertiser_id: str, campaign_id: str, name: str, copies: int, operation_status: str, adgroup_status: str, ad_status: str, landing_page_url: str | None, page_id: str | None, skip_adgroups: bool, skip_ads: bool, smart_plus: bool, copy_route: str='auto', verbose: bool) -> dict[str, Any]:
-    return _campaign_copy.execute_tiktok_campaign_copy(client, advertiser_id=advertiser_id, campaign_id=campaign_id, name=name, copies=copies, operation_status=operation_status, adgroup_status=adgroup_status, ad_status=ad_status, landing_page_url=landing_page_url, page_id=page_id, skip_adgroups=skip_adgroups, skip_ads=skip_ads, smart_plus=smart_plus, copy_route=copy_route, verbose=verbose, deps=_campaign_copy_dependencies())
+def execute_tiktok_campaign_copy(client: TikTokClient, *, advertiser_id: str, campaign_id: str, name: str, copies: int, operation_status: str, adgroup_status: str, ad_status: str, landing_page_url: str | None, page_id: str | None, skip_adgroups: bool, skip_ads: bool, smart_plus: bool, copy_route: str='auto', verbose: bool, job_id: str | None = None, resume: bool = False) -> dict[str, Any]:
+    return _campaign_copy.execute_tiktok_campaign_copy(client, advertiser_id=advertiser_id, campaign_id=campaign_id, name=name, copies=copies, operation_status=operation_status, adgroup_status=adgroup_status, ad_status=ad_status, landing_page_url=landing_page_url, page_id=page_id, skip_adgroups=skip_adgroups, skip_ads=skip_ads, smart_plus=smart_plus, copy_route=copy_route, verbose=verbose, deps=_campaign_copy_dependencies(), job_id=job_id, resume=resume)
 
 
 def command_tiktok_campaigns_copy(args: argparse.Namespace) -> None:
@@ -2619,7 +2632,10 @@ def command_tiktok_adgroups_create(args: argparse.Namespace) -> None:
 
 def command_tiktok_adgroups_update(args: argparse.Namespace) -> None:
     _, client = resolve_tiktok_client(args)
-    response = client.update_adgroup(build_adgroup_update_payload(args), smart_plus=args.smart_plus)
+    payload = build_adgroup_update_payload(args)
+    if args.smart_plus and {'bid_price', 'conversion_bid_price', 'roas_bid'} & payload.keys():
+        print('Smart+ bidding update: in campaigns with multiple ad groups, the platform can propagate this change to sibling ad groups.', file=sys.stderr)
+    response = client.update_adgroup(payload, smart_plus=args.smart_plus)
     print_output(response, as_json=args.json)
 
 
@@ -2983,7 +2999,8 @@ def command_tiktok_assets_share(args: argparse.Namespace) -> None:
 def command_tiktok_auth_advertisers(args: argparse.Namespace) -> None:
     app_id = validate_non_empty(getattr(args, "app_id", None), "app_id")
     secret = validate_non_empty(getattr(args, "secret", None), "secret")
-    access_token = validate_non_empty(getattr(args, "access_token", None), "access_token")
+    access_token = resolve_auth(account_id="", media_code="tiktok",
+                                access_token=getattr(args, "access_token", None), **options_from_args(args)).access_token
     client = TikTokClient(access_token)
     response = client.oauth2_advertiser_get(app_id, secret)
     print_output(response, as_json=args.json)
@@ -3269,15 +3286,11 @@ def command_tiktok_insights_smartplus_overview(args: argparse.Namespace) -> None
 def command_tiktok_landing_pages_analyze(args: argparse.Namespace) -> int:
     advertiser_ids = non_empty_list(getattr(args, "advertiser_ids", None))
     access_token = getattr(args, "access_token", None)
-    if not access_token:
-        if len(advertiser_ids) != 1:
-            raise CliError("TikTok landing-pages analyze requires --access-token when querying multiple advertisers")
-        auth = resolve_auth(
-            account_id=advertiser_ids[0],
-            media_code="tiktok",
-            access_token=access_token,
-        )
-        access_token = auth.access_token
+    auth = resolve_auth(
+        account_id=advertiser_ids[0] if len(advertiser_ids) == 1 else "",
+        media_code="tiktok", access_token=access_token, **options_from_args(args),
+    )
+    access_token = auth.access_token
 
     client = TikTokClient(access_token)
     start_date = getattr(args, "start_date", None)
@@ -3328,15 +3341,11 @@ def command_tiktok_landing_pages_analyze(args: argparse.Namespace) -> int:
 def command_tiktok_apps_analyze(args: argparse.Namespace) -> None:
     advertiser_ids = non_empty_list(getattr(args, "advertiser_ids", None))
     access_token = getattr(args, "access_token", None)
-    if not access_token:
-        if len(advertiser_ids) != 1:
-            raise CliError("TikTok apps analyze requires --access-token when querying multiple or auto-discovered advertisers")
-        auth = resolve_auth(
-            account_id=advertiser_ids[0],
-            media_code="tiktok",
-            access_token=access_token,
-        )
-        access_token = auth.access_token
+    auth = resolve_auth(
+        account_id=advertiser_ids[0] if len(advertiser_ids) == 1 else "",
+        media_code="tiktok", access_token=access_token, **options_from_args(args),
+    )
+    access_token = auth.access_token
 
     client = TikTokClient(access_token)
     start_date = getattr(args, "start_date", None)
@@ -3360,15 +3369,11 @@ def command_tiktok_apps_analyze(args: argparse.Namespace) -> None:
 def command_tiktok_user_type_analyze(args: argparse.Namespace) -> None:
     advertiser_ids = non_empty_list(getattr(args, "advertiser_ids", None))
     access_token = getattr(args, "access_token", None)
-    if not access_token:
-        if len(advertiser_ids) != 1:
-            raise CliError("TikTok user-type analyze requires --access-token when querying multiple or auto-discovered advertisers")
-        auth = resolve_auth(
-            account_id=advertiser_ids[0],
-            media_code="tiktok",
-            access_token=access_token,
-        )
-        access_token = auth.access_token
+    auth = resolve_auth(
+        account_id=advertiser_ids[0] if len(advertiser_ids) == 1 else "",
+        media_code="tiktok", access_token=access_token, **options_from_args(args),
+    )
+    access_token = auth.access_token
 
     client = TikTokClient(access_token)
     result = build_tiktok_user_type_report(
@@ -3391,15 +3396,11 @@ def command_tiktok_user_type_analyze(args: argparse.Namespace) -> None:
 def command_tiktok_metrics_probe(args: argparse.Namespace) -> None:
     advertiser_ids = non_empty_list(getattr(args, "advertiser_ids", None))
     access_token = getattr(args, "access_token", None)
-    if not access_token:
-        if len(advertiser_ids) != 1:
-            raise CliError("TikTok metrics probe requires --access-token when querying multiple or auto-discovered advertisers")
-        auth = resolve_auth(
-            account_id=advertiser_ids[0],
-            media_code="tiktok",
-            access_token=access_token,
-        )
-        access_token = auth.access_token
+    auth = resolve_auth(
+        account_id=advertiser_ids[0] if len(advertiser_ids) == 1 else "",
+        media_code="tiktok", access_token=access_token, **options_from_args(args),
+    )
+    access_token = auth.access_token
 
     client = TikTokClient(access_token)
     result = build_tiktok_metric_probe(

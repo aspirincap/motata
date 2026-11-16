@@ -1,0 +1,27 @@
+name: TikTok official contract watch
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '25 2 * * *'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r requirements-release.txt
+      - uses: actions/cache@v4
+        with:
+          path: .tiktok-contract-cache
+          key: tiktok-contract-${{ github.run_id }}
+          restore-keys: tiktok-contract-
+      - run: python scripts/check_tiktok_docs.py --cache-dir .tiktok-contract-cache --out outputs/tiktok-contract-report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tiktok-contract-report
+          path: outputs/tiktok-contract-report.json
+          retention-days: 30
