@@ -1,6 +1,7 @@
 """Real SQLite coordination with fake HTTP, clocks, and isolated child processes."""
 from concurrent.futures import ThreadPoolExecutor
 import json
+from contextlib import closing
 import os
 from pathlib import Path
 import sqlite3
@@ -245,7 +246,7 @@ class SharedThrottleTests(unittest.TestCase):
         client, _ = self.transport(requests.ConnectTimeout(), reply())
         client.request(READ)
         self.assertEqual(self.clock.waits, [5])
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             self.assertEqual(db.execute('SELECT cooldown_until FROM endpoint_limits').fetchone()[0], 0)
 
     def test_cancel_during_shared_wait_sends_nothing(self):
@@ -276,7 +277,7 @@ class SharedThrottleTests(unittest.TestCase):
         session.request.assert_not_called()
 
     def test_corrupt_numeric_state_is_rejected(self):
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.execute('INSERT INTO endpoint_limits VALUES (?, ?, ?)', (self.limiter._key(READ), 0, 'invalid'))
         client, session = self.transport(reply())
         with self.assertRaises(CliError) as caught:
