@@ -53,6 +53,12 @@ pre-publication run. npm versions are immutable: if publishing succeeded but a
 later verification failed, repair and rerun verification separately rather than
 trying to publish the same version again.
 
+The registry can briefly return `ETARGET`/`E404` after a successful publish.
+Registry installation acceptance refreshes metadata and waits up to fifteen 20-second
+intervals for those visibility errors only. Other install errors fail immediately.
+Use the read-only `npm-verify.yml` workflow with the exact version to rerun
+post-publication acceptance without invoking `npm publish` or moving the tag.
+
 ## Distribution contract
 
 - `package.json`, `pyproject.toml`, `motata_cli.__version__`, and the current entry in `motata_cli/skills_compatibility.json` must agree.

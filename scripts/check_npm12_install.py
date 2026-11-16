@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import time
 
 
 def run(args: list[str], cwd: Path, env: dict[str, str]) -> str:
@@ -21,6 +22,22 @@ def run(args: list[str], cwd: Path, env: dict[str, str]) -> str:
     if result.returncode:
         raise RuntimeError(f'{args[:3]} failed:\n{result.stdout}')
     return result.stdout.strip()
+
+
+def install_package(command: list[str], root: Path, env: dict[str, str], *, registry: bool) -> None:
+    # A successful publish can precede propagation to npm's install metadata.
+    # Retry only a missing registry version, never bootstrap or other failures.
+    attempts = 16 if registry else 1
+    for attempt in range(attempts):
+        try:
+            run(command, root, env)
+            return
+        except RuntimeError as error:
+            unavailable = any(code in str(error) for code in ('npm error code ETARGET', 'npm error code E404'))
+            if not unavailable or attempt + 1 == attempts:
+                raise
+            print(f'Registry version is still propagating; retry {attempt + 1}/{attempts - 1} in 20s', flush=True)
+            time.sleep(20)
 
 
 def main() -> None:
@@ -61,7 +78,9 @@ def main() -> None:
                    '--no-audit', '--no-fund']
         if args.tarball:
             command.append('--offline')
-        run(command + [spec], root, env)
+        else:
+            command.append('--prefer-online')
+        install_package(command + [spec], root, env, registry=not args.tarball)
         installed = prefix / ('node_modules/motata' if os.name == 'nt' else 'lib/node_modules/motata')
         assert json.loads((installed / 'package.json').read_text())['version'] == args.version
         assert not (installed / '.runtime').exists(), 'postinstall unexpectedly ran'

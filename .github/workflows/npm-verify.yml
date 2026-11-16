@@ -1,0 +1,36 @@
+name: Verify published npm version
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact published version to verify (does not publish)
+        required: true
+        default: '0.3.0'
+        type: string
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.22.3'
+          package-manager-cache: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Provision acceptance dependencies
+        run: |
+          npm install --global npm@12.2.2
+          python -m pip download --only-binary=:all: --dest /tmp/motata-wheelhouse -r requirements-release.txt
+      - name: Accept registry installation and provenance
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          python scripts/check_npm12_install.py --package "motata@$VERSION" --version "$VERSION" --wheelhouse /tmp/motata-wheelhouse
+          npm view "motata@$VERSION" dist.attestations --json --prefer-online --registry https://registry.npmjs.org/ > /tmp/motata-attestations.json
+          node -e "const a=require('/tmp/motata-attestations.json'); if (!a.url || !a.provenance) process.exit(1)"
