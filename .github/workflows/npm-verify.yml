@@ -33,4 +33,4 @@ jobs:
         run: |
           python scripts/check_npm12_install.py --package "motata@$VERSION" --version "$VERSION" --wheelhouse /tmp/motata-wheelhouse
           npm view "motata@$VERSION" dist.attestations --json --prefer-online --registry https://registry.npmjs.org/ > /tmp/motata-attestations.json
-          node -e "const a=require('/tmp/motata-attestations.json'); if (!a.url || !a.provenance) process.exit(1)"
+          node -e "const rows=require('/tmp/motata-attestations.json'); const a=Array.isArray(rows) && rows.length===1 ? rows[0] : rows; if (!a.url || !a.provenance) process.exit(1)"
